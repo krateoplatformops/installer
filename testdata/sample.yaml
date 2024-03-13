@@ -1,0 +1,56 @@
+apiVersion: krateo.io/v1alpha1
+kind: KrateoPlatformOps
+metadata:
+  name: krateo
+  namespace: krateo-system
+spec:
+  serviceType: NodePort
+  install:
+    - name: vcluster-k8s
+      version: 0.19.4
+      repository: https://charts.loft.sh
+    - name: krateo-gateway
+      version: 0.3.12
+      repository: https://charts.krateo.io
+      set:
+        - name: livenessProbe
+          value: null
+        - name: readinessProbe
+          value: null
+        - name: env.KRATEO_BFF_SERVER
+          value: http://krateo-bff.krateo-system.svc:8081
+        - name: env.KRATEO_GATEWAY_DEBUG
+          value: "true"
+        - name: env.KRATEO_GATEWAY_DUMP_ENV
+          value: "true"
+    - name: authn-service
+      version: 0.10.1
+      repository: https://charts.krateo.io
+      set:
+        - name: env.AUTHN_DUMP_ENV
+          value: "true"
+        - name: env.AUTHN_CORS
+          value: "true"
+    - name: krateo-bff
+      version: 0.14.3
+      repository: https://charts.krateo.io
+      set:
+        - name: env.KRATEO_BFF_CORS
+          value: "true"
+        - name: env.KRATEO_BFF_DUMP_ENV
+          value: "true"
+        - name: env.KRATEO_BFF_DEBUG
+          value: "true"
+    - name: core-provider
+      version: 0.9.0
+      repository: https://charts.krateo.io
+    - name: krateo-frontend
+      version: 2.0.6
+      repository: https://charts.krateo.io
+      set:
+        - name: env.AUTHN_API_BASE_URL
+          value: http://$AUTHN_SERVICE_LOADBALANCER_IP:8082
+        - name: env.BFF_API_BASE_URL
+          value: http://$KRATEO_BFF_LOADBALANCER_IP:8081
+  
+  
