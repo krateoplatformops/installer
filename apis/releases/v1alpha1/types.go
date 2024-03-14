@@ -3,31 +3,33 @@ package v1alpha1
 import (
 	"helm.sh/helm/v3/pkg/release"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 
 	prv1 "github.com/krateoplatformops/provider-runtime/apis/common/v1"
 )
 
-// DataKeySelector defines required spec to access a key of a configmap or secret
-type DataKeySelector struct {
-	prv1.Reference `json:",inline,omitempty"`
-	Key            string `json:"key,omitempty"`
-	Optional       bool   `json:"optional,omitempty"`
+type Data struct {
+	Name  string `json:"name"`
+	Value string `json:"value,omitempty"`
 }
 
-// ValueFromSource represents source of a value
+type ObjectMeta struct {
+	APIVersion string         `json:"apiVersion"`
+	Kind       string         `json:"kind"`
+	Metadata   prv1.Reference `json:"metadata"`
+}
+
 type ValueFromSource struct {
-	ConfigMapKeyRef *DataKeySelector `json:"configMapKeyRef,omitempty"`
-	SecretKeyRef    *DataKeySelector `json:"secretKeyRef,omitempty"`
+	ObjectMeta `json:",inline"`
+	Selector   string `json:"selector,omitempty"`
 }
 
-// SetVal represents a "set" value override in a Release
-type SetVal struct {
-	Name      string           `json:"name"`
-	Value     string           `json:"value,omitempty"`
+type Var struct {
+	Data      `json:",inline"`
 	ValueFrom *ValueFromSource `json:"valueFrom,omitempty"`
 }
 
-type ReleaseParameters struct {
+type HelmChartSpec struct {
 	// Repository: Helm repository URL, required if ChartSpec.URL not set
 	Repository string `json:"repository,omitempty"`
 	// Name of Helm chart, required if ChartSpec.URL not set
@@ -49,28 +51,52 @@ type ReleaseParameters struct {
 	// ready. Only applies if wait is also set. Defaults to 5m.
 	WaitTimeout *metav1.Duration `json:"waitTimeout,omitempty"`
 	// Set defines the Helm values
-	Set []SetVal `json:"set,omitempty"`
+	Set []*Data `json:"set,omitempty"`
 	// SkipCRDs skips installation of CRDs for the release.
 	//SkipCRDs bool `json:"skipCRDs,omitempty"`
 	// InsecureSkipTLSVerify skips tls certificate checks for the chart download
 	InsecureSkipTLSVerify *bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
-type ReleaseObservation struct {
-	State              release.Status `json:"state,omitempty"`
-	ReleaseDescription string         `json:"releaseDescription,omitempty"`
-	Revision           int            `json:"revision,omitempty"`
+type HelmChartObservation struct {
+	State    release.Status `json:"state,omitempty"`
+	Revision int            `json:"revision,omitempty"`
 }
 
-type KrateoPlatformOpsSpec struct {
+type Object struct {
+	ObjectMeta `json:",inline"`
+	Set        []*Data `json:"set,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=object;chart;var
+type StepType string
+
+const (
+	TypeObject StepType = "object"
+	TypeChart  StepType = "chart"
+	TypeVar    StepType = "var"
+)
+
+type Step struct {
+	ID   *string  `json:"id,omitempty"`
+	Type StepType `json:"type"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	With *runtime.RawExtension `json:"with"`
+}
+
+type StepStatus struct {
+	ID  *string `json:"id,omitempty"`
+	Err *string `json:"err,omitempty"`
+}
+
+type WorkflowSpec struct {
 	prv1.ManagedSpec `json:",inline"`
-	ServiceType      *string              `json:"serviceType,omitempty"`
-	Releases         []*ReleaseParameters `json:"install,omitempty"`
+	Steps            []*Step `json:"steps,omitempty"`
 }
 
-type KrateoPlatformOpsStatus struct {
+type WorkflowStatus struct {
 	prv1.ManagedStatus `json:",inline"`
-	Releases           []*ReleaseObservation `json:"releases,omitempty"`
+	Steps              []*StepStatus `json:"steps,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -84,8 +110,8 @@ type KrateoPlatformOps struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   KrateoPlatformOpsSpec   `json:"spec"`
-	Status KrateoPlatformOpsStatus `json:"status,omitempty"`
+	Spec   WorkflowSpec   `json:"spec"`
+	Status WorkflowStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

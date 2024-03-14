@@ -59,120 +59,25 @@ spec:
                 - Orphan
                 - Delete
                 type: string
-              install:
+              steps:
                 items:
                   properties:
-                    insecureSkipTLSVerify:
-                      description: |-
-                        SkipCRDs skips installation of CRDs for the release.
-                        SkipCRDs bool `json:"skipCRDs,omitempty"`
-                        InsecureSkipTLSVerify skips tls certificate checks for the chart download
-                      type: boolean
-                    name:
-                      description: Name of Helm chart, required if ChartSpec.URL not
-                        set
+                    id:
                       type: string
-                    pullSecretRef:
-                      description: PullSecretRef is reference to the secret containing
-                        credentials to helm repository
-                      properties:
-                        key:
-                          description: The key to select.
-                          type: string
-                        name:
-                          description: Name of the referenced object.
-                          type: string
-                        namespace:
-                          description: Namespace of the referenced object.
-                          type: string
-                      required:
-                      - key
-                      - name
-                      - namespace
+                    type:
+                      enum:
+                      - object
+                      - chart
+                      - var
+                      type: string
+                    with:
                       type: object
-                    repository:
-                      description: 'Repository: Helm repository URL, required if ChartSpec.URL
-                        not set'
-                      type: string
-                    set:
-                      description: Set defines the Helm values
-                      items:
-                        description: SetVal represents a "set" value override in a
-                          Release
-                        properties:
-                          name:
-                            type: string
-                          value:
-                            type: string
-                          valueFrom:
-                            description: ValueFromSource represents source of a value
-                            properties:
-                              configMapKeyRef:
-                                description: DataKeySelector defines required spec
-                                  to access a key of a configmap or secret
-                                properties:
-                                  key:
-                                    type: string
-                                  name:
-                                    description: Name of the referenced object.
-                                    type: string
-                                  namespace:
-                                    description: Namespace of the referenced object.
-                                    type: string
-                                  optional:
-                                    type: boolean
-                                required:
-                                - name
-                                - namespace
-                                type: object
-                              secretKeyRef:
-                                description: DataKeySelector defines required spec
-                                  to access a key of a configmap or secret
-                                properties:
-                                  key:
-                                    type: string
-                                  name:
-                                    description: Name of the referenced object.
-                                    type: string
-                                  namespace:
-                                    description: Namespace of the referenced object.
-                                    type: string
-                                  optional:
-                                    type: boolean
-                                required:
-                                - name
-                                - namespace
-                                type: object
-                            type: object
-                        required:
-                        - name
-                        type: object
-                      type: array
-                    url:
-                      description: URL to chart package (typically .tgz), optional
-                        and overrides others fields in the spec
-                      type: string
-                    version:
-                      description: Version of Helm chart, late initialized with latest
-                        version if not set
-                      type: string
-                    wait:
-                      description: |-
-                        Namespace to install the release into.
-                        Namespace string `json:"namespace"`
-                        SkipCreateNamespace won't create the namespace for the release. This requires the namespace to already exist.
-                        SkipCreateNamespace bool `json:"skipCreateNamespace,omitempty"`
-                        Wait for the release to become ready.
-                      type: boolean
-                    waitTimeout:
-                      description: |-
-                        WaitTimeout is the duration Helm will wait for the release to become
-                        ready. Only applies if wait is also set. Defaults to 5m.
-                      type: string
+                      x-kubernetes-preserve-unknown-fields: true
+                  required:
+                  - type
+                  - with
                   type: object
                 type: array
-              serviceType:
-                type: string
             type: object
           status:
             properties:
@@ -212,15 +117,12 @@ spec:
                   - type
                   type: object
                 type: array
-              releases:
+              steps:
                 items:
                   properties:
-                    releaseDescription:
+                    err:
                       type: string
-                    revision:
-                      type: integer
-                    state:
-                      description: Status is the status of a release
+                    id:
                       type: string
                   type: object
                 type: array
