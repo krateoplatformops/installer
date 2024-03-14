@@ -16,8 +16,9 @@ type varHandler struct {
 	ns  string
 }
 
-func (r *varHandler) Namespace(ns string) {
+func (r *varHandler) Namespace(ns string) *varHandler {
 	r.ns = ns
+	return r
 }
 
 func (r *varHandler) Do(ctx context.Context, res *v1alpha1.Var) error {

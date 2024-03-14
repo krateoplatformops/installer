@@ -11,17 +11,17 @@ import (
 	"helm.sh/helm/v3/pkg/strvals"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/rest"
 )
 
 type objHandler struct {
-	rc  *rest.Config
+	app *dynamic.Applier
 	env *cache.Cache[string, string]
 	ns  string
 }
 
-func (r *objHandler) Namespace(ns string) {
+func (r *objHandler) Namespace(ns string) *objHandler {
 	r.ns = ns
+	return r
 }
 
 func (r *objHandler) Do(ctx context.Context, res *v1alpha1.Object) error {
@@ -62,12 +62,7 @@ func (r *objHandler) Do(ctx context.Context, res *v1alpha1.Object) error {
 		namespace = r.ns
 	}
 
-	dyn, err := dynamic.NewApplier(r.rc)
-	if err != nil {
-		return err
-	}
-
-	return dyn.Apply(ctx, uns.Object, dynamic.ApplyOptions{
+	return r.app.Apply(ctx, uns.Object, dynamic.ApplyOptions{
 		GVK:       gv.WithKind(uns.GetKind()),
 		Namespace: namespace,
 		Name:      uns.GetName(),

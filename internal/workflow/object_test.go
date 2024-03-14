@@ -7,6 +7,7 @@ import (
 
 	"github.com/krateoplatformops/installer/apis/releases/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
+	"github.com/krateoplatformops/installer/internal/kubernetes/dynamic"
 )
 
 func TestObject(t *testing.T) {
@@ -26,11 +27,16 @@ func TestObject(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app, err := dynamic.NewApplier(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	env := cache.New[string, string]()
 	env.Set("KUBECONFIG_CAKEY", "XXXXX")
 
 	oh := &objHandler{
-		rc:  rc,
+		app: app,
 		env: env,
 		ns:  "krateo-system",
 	}
