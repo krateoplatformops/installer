@@ -26,17 +26,13 @@ func TestObject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// dyn, err := dynamic.NewApplier(rc)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-
 	env := cache.New[string, string]()
 	env.Set("KUBECONFIG_CAKEY", "XXXXX")
 
 	oh := &objHandler{
 		rc:  rc,
 		env: env,
+		ns:  "krateo-system",
 	}
 
 	err = oh.Do(context.TODO(), &res)

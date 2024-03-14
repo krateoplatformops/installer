@@ -2,11 +2,15 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/krateoplatformops/installer/apis/releases/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
+	"github.com/krateoplatformops/installer/internal/kubernetes/dynamic"
+	"helm.sh/helm/v3/pkg/strvals"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
 
@@ -21,36 +25,51 @@ func (r *objHandler) Namespace(ns string) {
 }
 
 func (r *objHandler) Do(ctx context.Context, res *v1alpha1.Object) error {
-
-	for _, el := range res.Set {
+	all := make([]string, len(res.Set))
+	for i, el := range res.Set {
 		if len(el.Value) > 0 {
 			val := el.Value
 			if strings.HasPrefix(val, "$") && len(val) > 1 {
 				val, _ = r.env.Get(el.Value[1:])
 			}
-			el.Value = val
+			all[i] = fmt.Sprintf("%s=%s", el.Name, val)
 		}
 	}
-	spew.Dump(res)
-	// unstr := unstructured.Unstructured{Object: src}
 
-	// gv, err := schema.ParseGroupVersion(res.GetAPIVersion())
-	// if err != nil {
-	// 	return err
-	// }
+	src := map[string]any{
+		"apiVersion": res.APIVersion,
+		"kind":       res.Kind,
+		"metadata": map[string]any{
+			"name":      res.Metadata.Name,
+			"namespace": res.Metadata.Namespace,
+		},
+	}
 
-	// namespace := res.GetNamespace()
-	// if len(namespace) == 0 {
-	// 	namespace = r.ns
-	// }
+	err := strvals.ParseInto(strings.Join(all, ","), src)
+	if err != nil {
+		return err
+	}
 
-	// name := res.GetName()
+	uns := unstructured.Unstructured{Object: src}
 
-	// return r.dyn.Apply(ctx, res.Object, dynamic.ApplyOptions{
-	// 	GVK:       gv.WithKind(res.GetKind()),
-	// 	Namespace: namespace,
-	// 	Name:      name,
-	// })
+	gv, err := schema.ParseGroupVersion(uns.GetAPIVersion())
+	if err != nil {
+		return err
+	}
 
-	return nil
+	namespace := uns.GetNamespace()
+	if len(namespace) == 0 {
+		namespace = r.ns
+	}
+
+	dyn, err := dynamic.NewApplier(r.rc)
+	if err != nil {
+		return err
+	}
+
+	return dyn.Apply(ctx, uns.Object, dynamic.ApplyOptions{
+		GVK:       gv.WithKind(uns.GetKind()),
+		Namespace: namespace,
+		Name:      uns.GetName(),
+	})
 }

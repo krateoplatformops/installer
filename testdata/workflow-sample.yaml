@@ -33,4 +33,4 @@ spec:
           - name: type
             value: Opaque
           - name: stringData.KRATEO_GATEWAY_CAKEY
-            value: vars.KUBECONFIG_CAKEY
+            value: $KUBECONFIG_CAKEY
