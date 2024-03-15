@@ -1,17 +1,13 @@
-package release
+package steps
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/krateoplatformops/installer/apis/releases/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/helmclient"
-	"k8s.io/apimachinery/pkg/runtime"
-	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -60,46 +56,12 @@ func newRestConfig() (*rest.Config, error) {
 	return clientcmd.BuildConfigFromFlags("", filepath.Join(home, ".kube", "config"))
 }
 
-func decodeSample() (*v1alpha1.KrateoPlatformOps, error) {
-	fin, err := os.Open("../../testdata/sample.yaml")
+func loadSample(fn string) ([]byte, error) {
+	fin, err := os.Open(filepath.Join("..", "..", "testdata", fn))
 	if err != nil {
 		return nil, err
 	}
 	defer fin.Close()
 
-	dat, err := io.ReadAll(fin)
-	if err != nil {
-		return nil, err
-	}
-
-	s := runtime.NewScheme()
-	s.AddKnownTypes(v1alpha1.SchemeGroupVersion,
-		&v1alpha1.KrateoPlatformOps{},
-		&v1alpha1.KrateoPlatformOpsList{},
-	)
-
-	serializer := jsonserializer.NewSerializerWithOptions(
-		jsonserializer.DefaultMetaFactory, // jsonserializer.MetaFactory
-		s,                                 // runtime.Scheme implements runtime.ObjectCreater
-		s,                                 // runtime.Scheme implements runtime.ObjectTyper
-		jsonserializer.SerializerOptions{
-			Yaml:   true,
-			Pretty: false,
-			Strict: false,
-		},
-	)
-
-	obj, _, err := serializer.Decode(dat, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	if obj == nil {
-		return nil, fmt.Errorf("obj is nil")
-	}
-
-	res, ok := obj.(*v1alpha1.KrateoPlatformOps)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type '%T' for obj", obj)
-	}
-	return res, err
+	return io.ReadAll(fin)
 }

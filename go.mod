@@ -6,10 +6,13 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/golang/mock v1.6.0
+	github.com/google/go-cmp v0.6.0
+	github.com/itchyny/gojq v0.12.14
 	github.com/krateoplatformops/provider-runtime v0.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stoewer/go-strcase v1.2.0
+	github.com/twmb/murmur3 v1.1.8
 	helm.sh/helm/v3 v3.14.2
 	k8s.io/apiextensions-apiserver v0.29.2
 	k8s.io/apimachinery v0.29.2
@@ -68,7 +71,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gnostic-models v0.6.9-0.20230804172637-c7be7c783f49 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -81,6 +83,7 @@ require (
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -92,7 +95,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -112,6 +115,7 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.46.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
+	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rubenv/sql-migrate v1.5.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect

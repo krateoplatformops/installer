@@ -1,0 +1,38 @@
+apiVersion: krateo.io/v1alpha1
+kind: KrateoPlatformOps
+metadata:
+  annotations:
+    "krateo.io/connector-verbose": "true"
+  name: krateo
+  namespace: krateo-system
+spec:
+  steps:
+    - id: vcluster
+      type: chart
+      with:
+        name: vcluster-k8s
+        version: 0.19.4
+        repository: https://charts.loft.sh
+        wait: true
+    - id: extract-vcluster-cakey
+      type: var
+      with:
+        name: KUBECONFIG_CAKEY
+        valueFrom:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: vcluster-k8s-certs
+          selector: .data."ca.key"
+    - id: cakey-for-gateway
+      type: object
+      with:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: krateo-gateway
+        set:
+          - name: type
+            value: Opaque
+          - name: stringData.KRATEO_GATEWAY_CAKEY
+            value: $KUBECONFIG_CAKEY
