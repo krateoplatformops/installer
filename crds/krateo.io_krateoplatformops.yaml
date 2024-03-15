@@ -65,15 +65,21 @@ spec:
                     id:
                       type: string
                     type:
-                      enum:
-                      - object
-                      - chart
-                      - var
+                      allOf:
+                      - enum:
+                        - object
+                        - chart
+                        - var
+                      - enum:
+                        - object
+                        - chart
+                        - var
                       type: string
                     with:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                   required:
+                  - id
                   - type
                   - with
                   type: object
@@ -118,14 +124,16 @@ spec:
                   type: object
                 type: array
               steps:
-                items:
+                additionalProperties:
                   properties:
+                    digest:
+                      type: string
                     err:
                       type: string
                     id:
                       type: string
                   type: object
-                type: array
+                type: object
             type: object
         required:
         - spec

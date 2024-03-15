@@ -1,7 +1,7 @@
 package apis
 
 import (
-	releasesv1alpha1 "github.com/krateoplatformops/installer/apis/releases/v1alpha1"
+	workflowsv1alpha1 "github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -15,6 +15,6 @@ func AddToScheme(s *runtime.Scheme) error {
 
 func init() {
 	AddToSchemes = append(AddToSchemes,
-		releasesv1alpha1.SchemeBuilder.AddToScheme,
+		workflowsv1alpha1.SchemeBuilder.AddToScheme,
 	)
 }

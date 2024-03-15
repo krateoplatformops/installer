@@ -1,6 +1,8 @@
 apiVersion: krateo.io/v1alpha1
 kind: KrateoPlatformOps
 metadata:
+  annotations:
+    "krateo.io/connector-verbose": "true"
   name: krateo
   namespace: krateo-system
 spec:
@@ -21,7 +23,7 @@ spec:
           kind: Secret
           metadata:
             name: vcluster-k8s-certs
-          selector: ${ .data."ca.key" }
+          selector: .data."ca.key"
     - id: cakey-for-gateway
       type: object
       with:

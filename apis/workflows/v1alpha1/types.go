@@ -1,11 +1,15 @@
 package v1alpha1
 
 import (
+	"strconv"
+
 	"helm.sh/helm/v3/pkg/release"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/krateoplatformops/installer/internal/ptr"
 	prv1 "github.com/krateoplatformops/provider-runtime/apis/common/v1"
+	"github.com/twmb/murmur3"
 )
 
 type Data struct {
@@ -29,7 +33,7 @@ type Var struct {
 	ValueFrom *ValueFromSource `json:"valueFrom,omitempty"`
 }
 
-type HelmChartSpec struct {
+type ChartSpec struct {
 	// Repository: Helm repository URL, required if ChartSpec.URL not set
 	Repository string `json:"repository,omitempty"`
 	// Name of Helm chart, required if ChartSpec.URL not set
@@ -44,7 +48,7 @@ type HelmChartSpec struct {
 	// Namespace to install the release into.
 	//Namespace string `json:"namespace"`
 	// SkipCreateNamespace won't create the namespace for the release. This requires the namespace to already exist.
-	//SkipCreateNamespace bool `json:"skipCreateNamespace,omitempty"`
+	SkipCreateNamespace bool `json:"skipCreateNamespace,omitempty"`
 	// Wait for the release to become ready.
 	Wait *bool `json:"wait,omitempty"`
 	// WaitTimeout is the duration Helm will wait for the release to become
@@ -58,7 +62,7 @@ type HelmChartSpec struct {
 	InsecureSkipTLSVerify *bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
-type HelmChartObservation struct {
+type ChartObservation struct {
 	State    release.Status `json:"state,omitempty"`
 	Revision int            `json:"revision,omitempty"`
 }
@@ -78,15 +82,30 @@ const (
 )
 
 type Step struct {
-	ID   *string  `json:"id,omitempty"`
+	// +kubebuilder:validation:Required
+	ID string `json:"id"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=object;chart;var
 	Type StepType `json:"type"`
 	// +kubebuilder:pruning:PreserveUnknownFields
 	With *runtime.RawExtension `json:"with"`
 }
 
+func (s *Step) Digest() string {
+	if s.With == nil || len(s.With.Raw) == 0 {
+		return ""
+	}
+
+	hasher := murmur3.New64()
+	hasher.Write(s.With.Raw)
+
+	return strconv.FormatUint(hasher.Sum64(), 16)
+}
+
 type StepStatus struct {
-	ID  *string `json:"id,omitempty"`
-	Err *string `json:"err,omitempty"`
+	ID     *string `json:"id,omitempty"`
+	Digest *string `json:"digest,omitempty"`
+	Err    *string `json:"err,omitempty"`
 }
 
 type WorkflowSpec struct {
@@ -96,7 +115,23 @@ type WorkflowSpec struct {
 
 type WorkflowStatus struct {
 	prv1.ManagedStatus `json:",inline"`
-	Steps              []*StepStatus `json:"steps,omitempty"`
+	Steps              map[string]StepStatus `json:"steps,omitempty"`
+}
+
+func (wfs *WorkflowStatus) Digest(id string) string {
+	got, ok := wfs.Steps[id]
+	if !ok {
+		return ""
+	}
+	return ptr.Deref(got.Digest, "")
+}
+
+func (wfs *WorkflowStatus) Err(id string) string {
+	got, ok := wfs.Steps[id]
+	if !ok {
+		return ""
+	}
+	return ptr.Deref(got.Err, "")
 }
 
 // +kubebuilder:object:root=true

@@ -1,23 +1,19 @@
-package workflow
+//go:build integration
+// +build integration
+
+package steps
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
-	"github.com/krateoplatformops/installer/apis/releases/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
-	"github.com/krateoplatformops/installer/internal/kubernetes/dynamic"
+	"github.com/krateoplatformops/installer/internal/dynamic"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestObject(t *testing.T) {
 	dat, err := loadSample("obj-sample.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	res := v1alpha1.Object{}
-	err = json.Unmarshal(dat, &res)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,15 +31,16 @@ func TestObject(t *testing.T) {
 	env := cache.New[string, string]()
 	env.Set("KUBECONFIG_CAKEY", "XXXXX")
 
-	oh := &objHandler{
-		app: app,
+	oh := &objStepHandler{
+		dyn: app,
 		env: env,
 		ns:  "krateo-system",
 	}
 
-	err = oh.Do(context.TODO(), &res)
+	err = oh.Handle(context.TODO(), "test", &runtime.RawExtension{
+		Raw: dat,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-
 }

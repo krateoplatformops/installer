@@ -1,27 +1,42 @@
-package workflow
+package steps
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
-	"github.com/krateoplatformops/installer/apis/releases/v1alpha1"
+	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
-	"github.com/krateoplatformops/installer/internal/kubernetes/dynamic"
+	"github.com/krateoplatformops/installer/internal/dynamic"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type varHandler struct {
+var _ Handler = (*varStepHandler)(nil)
+
+func VarHandler(dyn *dynamic.Getter, env *cache.Cache[string, string]) Handler {
+	return &varStepHandler{
+		dyn: dyn, env: env,
+	}
+}
+
+type varStepHandler struct {
 	dyn *dynamic.Getter
 	env *cache.Cache[string, string]
 	ns  string
 }
 
-func (r *varHandler) Namespace(ns string) *varHandler {
+func (r *varStepHandler) Namespace(ns string) {
 	r.ns = ns
-	return r
 }
 
-func (r *varHandler) Do(ctx context.Context, res *v1alpha1.Var) error {
+func (r *varStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) error {
+	res := v1alpha1.Var{}
+	err := json.Unmarshal(ext.Raw, &res)
+	if err != nil {
+		return err
+	}
+
 	if len(res.Value) > 0 {
 		val := res.Value
 		if strings.HasPrefix(val, "$") && len(val) > 1 {

@@ -1,33 +1,33 @@
 //go:build integration
 // +build integration
 
-package workflow
+package workflows
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/krateoplatformops/installer/apis/releases/v1alpha1"
-	"github.com/krateoplatformops/installer/internal/cache"
-	"github.com/krateoplatformops/installer/internal/kubernetes/dynamic"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/ptr"
+	"github.com/krateoplatformops/provider-runtime/pkg/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
-func TestVarResolver(t *testing.T) {
-	dat, err := loadSample("var-value-from-secret.json")
+func TestWorkflow(t *testing.T) {
+	dat, err := loadSample("krateo.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res := v1alpha1.Var{}
-	err = json.Unmarshal(dat, &res)
+	res, err := decodeYAML(dat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,50 +37,28 @@ func TestVarResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dyn, err := dynamic.NewGetter(rc)
+	wf, err := New(rc, res.GetNamespace(), meta.IsVerbose(res))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	env := cache.New[string, string]()
+	results := wf.Run(context.TODO(), res.Spec.DeepCopy())
 
-	vr := &varHandler{
-		dyn: dyn,
-		env: env,
-		ns:  "krateo-system",
+	res.Status.Steps = make(map[string]v1alpha1.StepStatus)
+
+	for _, x := range results {
+		nfo := v1alpha1.StepStatus{
+			ID:     ptr.To(x.ID()),
+			Digest: ptr.To(x.Digest()),
+		}
+		if err := x.Err(); err != nil {
+			nfo.Err = ptr.To(err.Error())
+		}
+
+		res.Status.Steps[x.ID()] = nfo
 	}
 
-	err = vr.Do(context.TODO(), &res)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	env.ForEach(func(k, v string) bool {
-		fmt.Printf("==> %s: %s\n", k, v)
-		return true
-	})
-}
-
-func TestDecodeVar(t *testing.T) {
-	dat, err := loadSample("task-sample.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	obj, err := decodeYAML(dat)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, step := range obj.Spec.Steps {
-		fmt.Printf("step: %s (%s)\n", ptr.Deref(step.ID, ""), step.Type)
-		// switch step.Type {
-		// case v1alpha1.TypeVar:
-		// 	err := handleVar(step.With)
-		// 	if err != nil {
-		// 		t.Fatal(err)
-		// 	}
-		// }
-	}
+	spew.Dump(res)
 }
 
 func decodeYAML(dat []byte) (*v1alpha1.KrateoPlatformOps, error) {
@@ -124,4 +102,13 @@ func loadSample(fn string) ([]byte, error) {
 	defer fin.Close()
 
 	return io.ReadAll(fin)
+}
+
+func newRestConfig() (*rest.Config, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	return clientcmd.BuildConfigFromFlags("", filepath.Join(home, ".kube", "config"))
 }
