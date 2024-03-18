@@ -3,6 +3,7 @@ package workflows
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
@@ -34,9 +35,9 @@ func New(rc *rest.Config, ns string, verbose bool) (*Workflow, error) {
 	env := cache.New[string, string]()
 
 	return &Workflow{
-		env: env,
-		rc:  rc,
-		ns:  ns,
+		verbose: verbose,
+		env:     env,
+		ns:      ns,
 		reg: map[v1alpha1.StepType]steps.Handler{
 			v1alpha1.TypeVar:    steps.VarHandler(dyn, env),
 			v1alpha1.TypeObject: steps.ObjectHandler(app, env),
@@ -74,16 +75,27 @@ func Err(results []StepResult) (string, error) {
 }
 
 type Workflow struct {
-	rc  *rest.Config
-	ns  string
-	env *cache.Cache[string, string]
-	reg map[v1alpha1.StepType]steps.Handler
+	verbose bool
+	ns      string
+	env     *cache.Cache[string, string]
+	reg     map[v1alpha1.StepType]steps.Handler
 }
 
-func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec) (results []StepResult) {
+func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec, skip func(*v1alpha1.Step) bool) (results []StepResult) {
 	results = make([]StepResult, len(spec.Steps))
 
 	for i, x := range spec.Steps {
+		if skip(x) {
+			if wf.verbose {
+				log.Printf("skipping step with id: %s (%v)", x.ID, x.Type)
+			}
+			continue
+		}
+
+		if wf.verbose {
+			log.Printf("executing step with id: %s (%v)", x.ID, x.Type)
+		}
+
 		results[i] = StepResult{id: x.ID}
 
 		job, ok := wf.reg[x.Type]

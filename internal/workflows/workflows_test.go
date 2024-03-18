@@ -42,7 +42,9 @@ func TestWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	results := wf.Run(context.TODO(), res.Spec.DeepCopy())
+	results := wf.Run(context.TODO(), res.Spec.DeepCopy(), func(s *v1alpha1.Step) bool {
+		return false
+	})
 
 	res.Status.Steps = make(map[string]v1alpha1.StepStatus)
 
@@ -58,6 +60,12 @@ func TestWorkflow(t *testing.T) {
 		res.Status.Steps[x.ID()] = nfo
 	}
 
+	wf.env.ForEach(func(k, v string) bool {
+
+		fmt.Printf("k: %s, v: %s\n", k, v)
+		return true
+	})
+	fmt.Println()
 	spew.Dump(res)
 }
 

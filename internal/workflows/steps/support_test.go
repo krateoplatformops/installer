@@ -57,7 +57,7 @@ func newRestConfig() (*rest.Config, error) {
 }
 
 func loadSample(fn string) ([]byte, error) {
-	fin, err := os.Open(filepath.Join("..", "..", "testdata", fn))
+	fin, err := os.Open(filepath.Join("..", "..", "..", "testdata", fn))
 	if err != nil {
 		return nil, err
 	}
