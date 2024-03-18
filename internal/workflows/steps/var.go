@@ -3,11 +3,11 @@ package steps
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
 	"github.com/krateoplatformops/installer/internal/dynamic"
+	"github.com/krateoplatformops/installer/internal/expand"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -17,13 +17,21 @@ var _ Handler = (*varStepHandler)(nil)
 func VarHandler(dyn *dynamic.Getter, env *cache.Cache[string, string]) Handler {
 	return &varStepHandler{
 		dyn: dyn, env: env,
+		subst: func(k string) string {
+			if v, ok := env.Get(k); ok {
+				return v
+			}
+
+			return "$" + k
+		},
 	}
 }
 
 type varStepHandler struct {
-	dyn *dynamic.Getter
-	env *cache.Cache[string, string]
-	ns  string
+	dyn   *dynamic.Getter
+	env   *cache.Cache[string, string]
+	ns    string
+	subst func(k string) string
 }
 
 func (r *varStepHandler) Namespace(ns string) {
@@ -38,10 +46,7 @@ func (r *varStepHandler) Handle(ctx context.Context, id string, ext *runtime.Raw
 	}
 
 	if len(res.Value) > 0 {
-		val := res.Value
-		if strings.HasPrefix(val, "$") && len(val) > 1 {
-			val, _ = r.env.Get(res.Value[1:])
-		}
+		val := expand.Expand(res.Value, "", r.subst)
 		r.env.Set(res.Name, val)
 	}
 

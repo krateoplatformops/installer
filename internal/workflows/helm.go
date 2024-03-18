@@ -1,8 +1,7 @@
 package workflows
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/krateoplatformops/installer/internal/helmclient"
 	"k8s.io/client-go/rest"
@@ -22,12 +21,9 @@ func newHelmClient(opts helmClientOptions) (helmclient.Client, error) {
 		Debug:            opts.verbose,
 		Linting:          false,
 		DebugLog: func(format string, v ...interface{}) {
-			if !opts.verbose {
-				return
+			if opts.verbose {
+				log.Printf(format, v...)
 			}
-
-			fmt.Fprintf(os.Stderr, format, v...)
-			fmt.Fprintln(os.Stderr)
 		},
 	}
 

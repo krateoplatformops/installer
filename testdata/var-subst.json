@@ -1,0 +1,4 @@
+{
+  "name": "GTW_HOST",
+  "value": "https://$KUBECONFIG_KUBERNETES_IP"
+}
