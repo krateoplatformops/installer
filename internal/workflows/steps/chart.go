@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
@@ -27,26 +29,55 @@ type chartStepHandler struct {
 	cli helmclient.Client
 	env *cache.Cache[string, string]
 	ns  string
+	op  Op
 }
 
 func (r *chartStepHandler) Namespace(ns string) {
 	r.ns = ns
 }
 
+func (r *chartStepHandler) Op(op Op) {
+	r.op = op
+}
+
 func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) error {
+	spec, err := r.toChartSpec(ext)
+	if err != nil {
+		return err
+	}
+
+	if r.op == Delete {
+		err := r.cli.UninstallRelease(spec)
+		if err != nil {
+			log.Printf("WARN: %s (%s)", err.Error(), spec.ChartName)
+			if strings.Contains(err.Error(), "release: not found") {
+				err = nil
+			}
+		}
+		return err
+	}
+
+	_, err = r.cli.InstallOrUpgradeChart(ctx, spec, nil)
+	return err
+}
+
+func (r *chartStepHandler) toChartSpec(ext *runtime.RawExtension) (*helmclient.ChartSpec, error) {
 	res := v1alpha1.ChartSpec{}
 	err := json.Unmarshal(ext.Raw, &res)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	entry := repo.Entry{
 		Name: deriveRepoName(res.Repository),
 		URL:  res.Repository,
 	}
-	err = r.cli.AddOrUpdateChartRepo(entry)
-	if err != nil {
-		return err
+
+	if r.op != Delete {
+		err = r.cli.AddOrUpdateChartRepo(entry)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	timeout := time.Duration(10 * time.Minute)
@@ -54,7 +85,7 @@ func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.R
 		timeout = res.WaitTimeout.Duration
 	}
 
-	spec := helmclient.ChartSpec{
+	spec := &helmclient.ChartSpec{
 		ReleaseName:     res.Name,
 		ChartName:       fmt.Sprintf("%s/%s", entry.Name, res.Name),
 		Namespace:       r.ns,
@@ -68,6 +99,5 @@ func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.R
 		Timeout: timeout,
 	}
 
-	_, err = r.cli.InstallOrUpgradeChart(ctx, &spec, nil)
-	return err
+	return spec, nil
 }

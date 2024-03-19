@@ -23,6 +23,11 @@ func New(rc *rest.Config, ns string, verbose bool) (*Workflow, error) {
 		return nil, err
 	}
 
+	del, err := dynamic.NewDeletor(rc)
+	if err != nil {
+		return nil, err
+	}
+
 	cli, err := newHelmClient(helmClientOptions{
 		namespace:  ns,
 		restConfig: rc,
@@ -40,7 +45,7 @@ func New(rc *rest.Config, ns string, verbose bool) (*Workflow, error) {
 		ns:      ns,
 		reg: map[v1alpha1.StepType]steps.Handler{
 			v1alpha1.TypeVar:    steps.VarHandler(dyn, env),
-			v1alpha1.TypeObject: steps.ObjectHandler(app, env),
+			v1alpha1.TypeObject: steps.ObjectHandler(app, del, env),
 			v1alpha1.TypeChart:  steps.ChartHandler(cli, env),
 		},
 	}, nil
@@ -79,6 +84,15 @@ type Workflow struct {
 	ns      string
 	env     *cache.Cache[string, string]
 	reg     map[v1alpha1.StepType]steps.Handler
+	op      steps.Op
+}
+
+func (wf *Workflow) Verbose() bool {
+	return wf.verbose
+}
+
+func (wf *Workflow) Op(op steps.Op) {
+	wf.op = op
 }
 
 func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec, skip func(*v1alpha1.Step) bool) (results []StepResult) {
@@ -105,6 +119,7 @@ func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec, skip f
 		}
 
 		job.Namespace(wf.ns)
+		job.Op(wf.op)
 
 		err := job.Handle(ctx, x.ID, x.With)
 		if err != nil {
