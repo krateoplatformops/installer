@@ -14,6 +14,7 @@ import (
 	workflowsv1alpha1 "github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/ptr"
 	"github.com/krateoplatformops/installer/internal/workflows"
+	"github.com/krateoplatformops/installer/internal/workflows/steps"
 	rtv1 "github.com/krateoplatformops/provider-runtime/apis/common/v1"
 	"github.com/krateoplatformops/provider-runtime/pkg/controller"
 	"github.com/krateoplatformops/provider-runtime/pkg/event"
@@ -28,8 +29,8 @@ import (
 const (
 	errNotCR = "managed resource is not a KrateoPlatformOps custom resource"
 
-	reconcileGracePeriod = 1 * time.Minute
-	reconcileTimeout     = 4 * time.Minute
+	creationGracePeriod = 5 * time.Minute
+	reconcileTimeout    = 20 * time.Minute
 )
 
 func Setup(mgr ctrl.Manager, o controller.Options) error {
@@ -47,7 +48,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			recorder: recorder,
 		}),
 		reconciler.WithTimeout(reconcileTimeout),
-		reconciler.WithCreationGracePeriod(reconcileGracePeriod),
+		reconciler.WithCreationGracePeriod(creationGracePeriod),
 		reconciler.WithPollInterval(o.PollInterval),
 		reconciler.WithLogger(log),
 		reconciler.WithRecorder(event.NewAPIRecorder(recorder)))
@@ -103,7 +104,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 	got := currentDigestMap(cr)
 	if len(got) == 0 {
 		return reconciler.ExternalObservation{
-			ResourceExists:   false,
+			ResourceExists:   !meta.WasDeleted(cr),
 			ResourceUpToDate: true,
 		}, nil
 	}
@@ -113,9 +114,20 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 		e.log.Debug("List of step to update", "tot", len(exp), "list", strings.Join(exp, ","))
 	}
 
+	if len(exp) == 0 {
+		cr.SetConditions(rtv1.Available())
+
+		err := e.kube.Status().Update(ctx, cr)
+
+		return reconciler.ExternalObservation{
+			ResourceExists:   true,
+			ResourceUpToDate: true,
+		}, err
+	}
+
 	return reconciler.ExternalObservation{
 		ResourceExists:   true,
-		ResourceUpToDate: len(exp) == 0,
+		ResourceUpToDate: false,
 	}, nil
 }
 
@@ -132,6 +144,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 
 	cr.SetConditions(rtv1.Creating())
 
+	e.wf.Op(steps.Create)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		return false
 	})
@@ -142,6 +155,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 
 	cr.Status.Steps = make(map[string]v1alpha1.StepStatus)
 
+	available := true
 	for _, x := range results {
 		nfo := v1alpha1.StepStatus{
 			ID:     ptr.To(x.ID()),
@@ -149,9 +163,14 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 		}
 		if err := x.Err(); err != nil {
 			nfo.Err = ptr.To(err.Error())
+			available = false
 		}
 
 		cr.Status.Steps[x.ID()] = nfo
+	}
+
+	if available {
+		cr.SetConditions(rtv1.Available())
 	}
 
 	return e.kube.Status().Update(ctx, cr)
@@ -168,20 +187,17 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 		return nil
 	}
 
-	verbose := meta.IsVerbose(cr)
-	_ = verbose
-
-	cr = cr.DeepCopy()
-
 	all := listOfStepIdToUpdate(cr)
 	if len(all) == 0 {
 		return nil
 	}
 
+	verbose := meta.IsVerbose(cr)
 	if verbose {
 		e.log.Debug("Step(s) to update", "ids", strings.Join(all, ","))
 	}
 
+	e.wf.Op(steps.Update)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		for _, id := range all {
 			if id == s.ID {
@@ -201,6 +217,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 
 	cr.Status.Steps = make(map[string]v1alpha1.StepStatus)
 
+	available := true
 	for _, x := range results {
 		nfo := v1alpha1.StepStatus{
 			ID:     ptr.To(x.ID()),
@@ -208,9 +225,14 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 		}
 		if err := x.Err(); err != nil {
 			nfo.Err = ptr.To(err.Error())
+			available = false
 		}
 
 		cr.Status.Steps[x.ID()] = nfo
+	}
+
+	if available {
+		cr.SetConditions(rtv1.Available())
 	}
 
 	return e.kube.Status().Update(ctx, cr)
@@ -227,7 +249,18 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return nil
 	}
 
-	cr.SetConditions(rtv1.Deleting())
+	e.wf.Op(steps.Delete)
+	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
+		return s.Type == v1alpha1.TypeVar
+	})
 
-	return nil
+	id, err := workflows.Err(results)
+	if err != nil {
+		e.log.Debug("Worflow delete failure", "step-id", id, "error", err.Error())
+		return err
+	}
+
+	cr.Status.Steps = make(map[string]workflowsv1alpha1.StepStatus)
+
+	return e.kube.Status().Update(ctx, cr)
 }

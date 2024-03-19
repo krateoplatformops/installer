@@ -32,6 +32,11 @@ type varStepHandler struct {
 	env   *cache.Cache[string, string]
 	ns    string
 	subst func(k string) string
+	op    Op
+}
+
+func (r *varStepHandler) Op(op Op) {
+	r.op = op
 }
 
 func (r *varStepHandler) Namespace(ns string) {

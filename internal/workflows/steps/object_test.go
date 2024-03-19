@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func TestObject(t *testing.T) {
+func TestObjectCreate(t *testing.T) {
 	dat, err := loadSample("obj-sample.json")
 	if err != nil {
 		t.Fatal(err)
@@ -32,9 +32,44 @@ func TestObject(t *testing.T) {
 	env.Set("KUBECONFIG_CAKEY", "XXXXX")
 
 	oh := &objStepHandler{
-		dyn: app,
+		app: app,
 		env: env,
 		ns:  "krateo-system",
+		op:  Create,
+	}
+
+	err = oh.Handle(context.TODO(), "test", &runtime.RawExtension{
+		Raw: dat,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestObjectDelete(t *testing.T) {
+	dat, err := loadSample("obj-sample.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rc, err := newRestConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	del, err := dynamic.NewDeletor(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env := cache.New[string, string]()
+	env.Set("KUBECONFIG_CAKEY", "XXXXX")
+
+	oh := &objStepHandler{
+		del: del,
+		env: env,
+		ns:  "krateo-system",
+		op:  Delete,
 	}
 
 	err = oh.Handle(context.TODO(), "test", &runtime.RawExtension{
