@@ -32,6 +32,9 @@ func main() {
 		debug = app.Flag("debug", "Run with debug logging.").Short('d').
 			OverrideDefaultFromEnvar(fmt.Sprintf("%s_DEBUG", envVarPrefix)).
 			Bool()
+		namespace = app.Flag("namespace", "Watch resources only in this namespace.").Short('n').
+				OverrideDefaultFromEnvar(fmt.Sprintf("%s_NAMESPACE", envVarPrefix)).
+				Default("").String()
 		syncPeriod = app.Flag("sync", "Controller manager sync period such as 300ms, 1.5h, or 2h45m").Short('s').
 				Default("1h").
 				Duration()
@@ -65,12 +68,19 @@ func main() {
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
 
+	co := cache.Options{
+		SyncPeriod: syncPeriod,
+	}
+	if len(*namespace) > 0 {
+		co.DefaultNamespaces = map[string]cache.Config{
+			*namespace: {},
+		}
+	}
+
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		LeaderElection:   *leaderElection,
 		LeaderElectionID: fmt.Sprintf("leader-election-%s-provider", strcase.KebabCase(providerName)),
-		Cache: cache.Options{
-			SyncPeriod: syncPeriod,
-		},
+		Cache:            co,
 	})
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 
