@@ -29,7 +29,7 @@ import (
 const (
 	errNotCR = "managed resource is not a KrateoPlatformOps custom resource"
 
-	creationGracePeriod = 5 * time.Minute
+	creationGracePeriod = 2 * time.Minute
 	reconcileTimeout    = 20 * time.Minute
 )
 
@@ -104,7 +104,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 	got := currentDigestMap(cr)
 	if len(got) == 0 {
 		return reconciler.ExternalObservation{
-			ResourceExists:   !meta.WasDeleted(cr),
+			ResourceExists:   false,
 			ResourceUpToDate: true,
 		}, nil
 	}
@@ -135,6 +135,10 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 	cr, ok := mg.(*workflowsv1alpha1.KrateoPlatformOps)
 	if !ok {
 		return errors.New(errNotCR)
+	}
+
+	if meta.WasDeleted(cr) {
+		return nil
 	}
 
 	if !meta.IsActionAllowed(cr, meta.ActionCreate) {
@@ -180,6 +184,10 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 	cr, ok := mg.(*workflowsv1alpha1.KrateoPlatformOps)
 	if !ok {
 		return errors.New(errNotCR)
+	}
+
+	if meta.WasDeleted(cr) {
+		return nil
 	}
 
 	if !meta.IsActionAllowed(cr, meta.ActionUpdate) {
