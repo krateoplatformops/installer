@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/krateoplatformops/installer/internal/helmclient"
@@ -22,7 +23,7 @@ func newHelmClient(opts helmClientOptions) (helmclient.Client, error) {
 		Linting:          false,
 		DebugLog: func(format string, v ...interface{}) {
 			if opts.verbose {
-				log.Printf(format, v...)
+				log.Printf("DBG: %s", fmt.Sprintf(format, v...))
 			}
 		},
 	}

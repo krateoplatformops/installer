@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	corev1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/utils/ptr"
 )
 
 type DeleteOptions struct {
@@ -59,5 +60,7 @@ func (g *Deletor) Delete(ctx context.Context, opts DeleteOptions) error {
 			Namespace(opts.Namespace)
 	}
 
-	return ri.Delete(ctx, opts.Name, corev1.DeleteOptions{})
+	return ri.Delete(ctx, opts.Name, metav1.DeleteOptions{
+		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
+	})
 }

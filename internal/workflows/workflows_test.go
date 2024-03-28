@@ -13,7 +13,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
-	"github.com/krateoplatformops/installer/internal/ptr"
 	"github.com/krateoplatformops/provider-runtime/pkg/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -46,18 +45,9 @@ func TestWorkflow(t *testing.T) {
 		return false
 	})
 
-	res.Status.Steps = make(map[string]v1alpha1.StepStatus)
-
-	for _, x := range results {
-		nfo := v1alpha1.StepStatus{
-			ID:     ptr.To(x.ID()),
-			Digest: ptr.To(x.Digest()),
-		}
-		if err := x.Err(); err != nil {
-			nfo.Err = ptr.To(err.Error())
-		}
-
-		res.Status.Steps[x.ID()] = nfo
+	err = Err(results)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	wf.env.ForEach(func(k, v string) bool {

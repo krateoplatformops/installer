@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"encoding/json"
+	"log"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
@@ -14,7 +15,7 @@ import (
 
 var _ Handler = (*varStepHandler)(nil)
 
-func VarHandler(dyn *dynamic.Getter, env *cache.Cache[string, string]) Handler {
+func VarHandler(dyn *dynamic.Getter, env *cache.Cache[string, string], verbose bool) Handler {
 	return &varStepHandler{
 		dyn: dyn, env: env,
 		subst: func(k string) string {
@@ -24,15 +25,17 @@ func VarHandler(dyn *dynamic.Getter, env *cache.Cache[string, string]) Handler {
 
 			return "$" + k
 		},
+		verbose: verbose,
 	}
 }
 
 type varStepHandler struct {
-	dyn   *dynamic.Getter
-	env   *cache.Cache[string, string]
-	ns    string
-	subst func(k string) string
-	op    Op
+	dyn     *dynamic.Getter
+	env     *cache.Cache[string, string]
+	ns      string
+	subst   func(k string) string
+	op      Op
+	verbose bool
 }
 
 func (r *varStepHandler) Op(op Op) {
@@ -53,6 +56,10 @@ func (r *varStepHandler) Handle(ctx context.Context, id string, ext *runtime.Raw
 	if len(res.Value) > 0 {
 		val := expand.Expand(res.Value, "", r.subst)
 		r.env.Set(res.Name, val)
+		if r.verbose {
+			log.Printf("DBG: step (id: %s), type: var (name: %s, value: %s)",
+				id, res.Name, ellipsis(val, 20))
+		}
 	}
 
 	if res.ValueFrom == nil {
@@ -83,6 +90,9 @@ func (r *varStepHandler) Handle(ctx context.Context, id string, ext *runtime.Raw
 	val, err := dynamic.Extract(ctx, obj, res.ValueFrom.Selector)
 	if val != nil {
 		r.env.Set(res.Name, strval(val))
+		if r.verbose {
+			log.Printf("DBG [var:%s]: var (name: %s, value: %s)", id, res.Name, ellipsis(strval(val), 30))
+		}
 	}
 
 	return err

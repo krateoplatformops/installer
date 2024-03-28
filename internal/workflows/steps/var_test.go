@@ -22,7 +22,7 @@ func TestVarExpand(t *testing.T) {
 	env := cache.New[string, string]()
 	env.Set("KUBECONFIG_KUBERNETES_IP", "127.0.0.1")
 
-	vr := VarHandler(nil, env)
+	vr := VarHandler(nil, env, true)
 	err = vr.Handle(context.TODO(), "test", &runtime.RawExtension{
 		Raw: dat,
 	})

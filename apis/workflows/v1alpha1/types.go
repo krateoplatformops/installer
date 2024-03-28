@@ -7,7 +7,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/krateoplatformops/installer/internal/ptr"
 	prv1 "github.com/krateoplatformops/provider-runtime/apis/common/v1"
 	"github.com/twmb/murmur3"
 )
@@ -102,12 +101,6 @@ func (s *Step) Digest() string {
 	return strconv.FormatUint(hasher.Sum64(), 16)
 }
 
-type StepStatus struct {
-	ID     *string `json:"id,omitempty"`
-	Digest *string `json:"digest,omitempty"`
-	Err    *string `json:"err,omitempty"`
-}
-
 type WorkflowSpec struct {
 	prv1.ManagedSpec `json:",inline"`
 	Steps            []*Step `json:"steps,omitempty"`
@@ -115,23 +108,7 @@ type WorkflowSpec struct {
 
 type WorkflowStatus struct {
 	prv1.ManagedStatus `json:",inline"`
-	Steps              map[string]StepStatus `json:"steps,omitempty"`
-}
-
-func (wfs *WorkflowStatus) Digest(id string) string {
-	got, ok := wfs.Steps[id]
-	if !ok {
-		return ""
-	}
-	return ptr.Deref(got.Digest, "")
-}
-
-func (wfs *WorkflowStatus) Err(id string) string {
-	got, ok := wfs.Steps[id]
-	if !ok {
-		return ""
-	}
-	return ptr.Deref(got.Err, "")
+	Digest             *string `json:"digest,omitempty"`
 }
 
 // +kubebuilder:object:root=true

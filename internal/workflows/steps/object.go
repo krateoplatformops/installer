@@ -3,11 +3,14 @@ package steps
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 	"strings"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
 	"github.com/krateoplatformops/installer/internal/dynamic"
+	"github.com/krateoplatformops/installer/internal/expand"
 	"helm.sh/helm/v3/pkg/strvals"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,18 +20,28 @@ import (
 
 var _ Handler = (*objStepHandler)(nil)
 
-func ObjectHandler(app *dynamic.Applier, del *dynamic.Deletor, env *cache.Cache[string, string]) Handler {
+func ObjectHandler(app *dynamic.Applier, del *dynamic.Deletor, env *cache.Cache[string, string], verbose bool) Handler {
 	return &objStepHandler{
 		app: app, del: del, env: env,
+		subst: func(k string) string {
+			if v, ok := env.Get(k); ok {
+				return v
+			}
+
+			return "$" + k
+		},
+		verbose: verbose,
 	}
 }
 
 type objStepHandler struct {
-	app *dynamic.Applier
-	del *dynamic.Deletor
-	env *cache.Cache[string, string]
-	ns  string
-	op  Op
+	app     *dynamic.Applier
+	del     *dynamic.Deletor
+	env     *cache.Cache[string, string]
+	ns      string
+	op      Op
+	subst   func(k string) string
+	verbose bool
 }
 
 func (r *objStepHandler) Namespace(ns string) {
@@ -40,7 +53,7 @@ func (r *objStepHandler) Op(op Op) {
 }
 
 func (r *objStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) error {
-	uns, err := r.toUnstructured(ext)
+	uns, err := r.toUnstructured(id, ext)
 	if err != nil {
 		return err
 	}
@@ -69,7 +82,7 @@ func (r *objStepHandler) Handle(ctx context.Context, id string, ext *runtime.Raw
 	})
 }
 
-func (r *objStepHandler) toUnstructured(ext *runtime.RawExtension) (*unstructured.Unstructured, error) {
+func (r *objStepHandler) toUnstructured(id string, ext *runtime.RawExtension) (*unstructured.Unstructured, error) {
 	res := v1alpha1.Object{}
 	err := json.Unmarshal(ext.Raw, &res)
 	if err != nil {
@@ -90,11 +103,28 @@ func (r *objStepHandler) toUnstructured(ext *runtime.RawExtension) (*unstructure
 		},
 	}
 
-	all := resolveVars(res.Set, r.env)
+	all := r.resolveVars(id, res.Set)
 	err = strvals.ParseInto(strings.Join(all, ","), src)
 	if err != nil {
 		return nil, err
 	}
 
 	return &unstructured.Unstructured{Object: src}, nil
+}
+
+func (r *objStepHandler) resolveVars(id string, res []*v1alpha1.Data) []string {
+	all := make([]string, len(res))
+	for i, el := range res {
+		if len(el.Value) > 0 {
+			val := expand.Expand(el.Value, "", r.subst)
+			all[i] = fmt.Sprintf("%s=%s", el.Name, val)
+
+			if r.verbose && r.op != Delete {
+				log.Printf("DBG [object:%s]: prop (name: %s, value: %s)",
+					id, el.Name, ellipsis(val, 20))
+			}
+		}
+	}
+
+	return all
 }

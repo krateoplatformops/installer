@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
-	"github.com/krateoplatformops/installer/internal/cache"
 	"github.com/twmb/murmur3"
 )
 
@@ -15,21 +13,6 @@ func computeDigest(dat []byte) string {
 	hasher.Write(dat)
 	hasher.Sum64()
 	return strconv.FormatUint(hasher.Sum64(), 16)
-}
-
-func resolveVars(res []*v1alpha1.Data, env *cache.Cache[string, string]) []string {
-	all := make([]string, len(res))
-	for i, el := range res {
-		if len(el.Value) > 0 {
-			val := el.Value
-			if strings.HasPrefix(val, "$") && len(val) > 1 {
-				val, _ = env.Get(el.Value[1:])
-			}
-			all[i] = fmt.Sprintf("%s=%s", el.Name, val)
-		}
-	}
-
-	return all
 }
 
 func strval(v any) string {
@@ -53,4 +36,63 @@ func deriveRepoName(repoUrl string) string {
 		idx = strings.LastIndexByte(repoUrl[0:idx], '.')
 	}
 	return strings.ReplaceAll(repoUrl[idx+1:], ".", "-")
+}
+
+// Ending ellipsis a long string s -> "front..."
+func ellipsis(s string, n int) string {
+	if n <= 3 {
+		return "..."
+	}
+
+	if len(s) <= n {
+		return s
+	}
+
+	n -= 3
+
+	var sb strings.Builder
+	sb.WriteString(cutString(s, n, cutLeftToRight))
+	sb.WriteString("...")
+
+	return sb.String()
+}
+
+const utf8CharMaxSize = 4
+
+type cutDirection bool
+
+const (
+	cutLeftToRight cutDirection = true
+	cutRightToLeft cutDirection = false
+)
+
+// cutString cuts a string s into a string of n utf-8 runes.
+func cutString(s string, n int, leftToRight cutDirection) string {
+	if n <= 0 {
+		return ""
+	}
+
+	if n >= len(s) {
+		return s
+	}
+
+	maxLen := n * utf8CharMaxSize
+	if maxLen >= len(s) {
+		maxLen = len(s)
+	}
+
+	var runes []rune
+	if leftToRight {
+		runes = []rune(s[:maxLen])
+		if len(runes) > n {
+			runes = runes[:n]
+		}
+	} else {
+		runes = []rune(s[len(s)-maxLen:])
+		if len(runes) > n {
+			runes = runes[len(runes)-n:]
+		}
+	}
+
+	return string(runes)
 }
