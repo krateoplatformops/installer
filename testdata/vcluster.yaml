@@ -1,0 +1,175 @@
+apiVersion: krateo.io/v1alpha1
+kind: KrateoPlatformOps
+metadata:
+  annotations:
+    "krateo.io/connector-verbose": "true"
+  name: vcluster-nodeport
+  namespace: krateo-system
+spec:
+  steps:
+    - id: install-vcluster
+      type: chart
+      with:
+        name: vcluster-k8s
+        version: 0.19.5
+        repository: https://charts.loft.sh
+        wait: true
+        waitTimeout: 5m
+        set:
+          - name: service.type
+            value: NodePort
+          - name: service.nodePort
+            value: "30090"
+          - name: init.manifests
+            value: |-
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: krateo-system
+
+    - id: extract-vcluster-cakey
+      type: var
+      with:
+        name: KUBECONFIG_CAKEY
+        valueFrom:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: vcluster-k8s-certs
+          selector: .data."ca.key"
+
+    - id: extract-vcluster-cacrt
+      type: var
+      with:
+        name: KUBECONFIG_CACRT
+        valueFrom:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: vcluster-k8s-certs
+          selector: .data."ca.crt"
+
+    - id: create-sa-for-vcluster-job
+      type: object
+      with:
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: vcluster-job-sa
+          namespace: krateo-system
+
+    - id: create-role-for-vcluster-job-sa
+      type: object
+      with:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: Role
+        metadata:
+          name: vcluster-job
+          namespace: krateo-system
+        set:
+          - name: rules[0].apiGroups
+            value: "{apps}"
+          - name: rules[0].verbs
+            value: "{list,get,watch}"
+          - name: rules[0].resources
+            value: "{statefulsets,deployments}"
+          - name: rules[1].apiGroups[0]
+            value: $null
+          - name: rules[1].verbs
+            value: "{list,get,watch}"
+          - name: rules[1].resources
+            value: "{pods}"
+
+    - id: create-rolebinding-for-vcluster-job-sa
+      type: object
+      with:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: vcluster-job
+          namespace: krateo-system
+        set:
+          - name: roleRef.apiGroup
+            value: rbac.authorization.k8s.io
+          - name: roleRef.kind
+            value: Role
+          - name: roleRef.name
+            value: vcluster-job
+          - name: subjects[0].kind
+            value: ServiceAccount
+          - name: subjects[0].name
+            value: vcluster-job-sa
+          - name: subjects[0].namespace
+            value: krateo-system
+
+    - id: create-rolebinding-for-vcluster-job-sa
+      type: object
+      with:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: vcluster-job
+          namespace: krateo-system
+        set:
+          - name: roleRef.apiGroup
+            value: rbac.authorization.k8s.io
+          - name: roleRef.kind
+            value: ClusterRole
+          - name: roleRef.name
+            value: cluster-admin
+          - name: subjects[0].kind
+            value: ServiceAccount
+          - name: subjects[0].name
+            value: vcluster-job-sa
+          - name: subjects[0].namespace
+            value: krateo-system
+
+    - id: job-to-copy-secret-in-vcluster
+      type: object
+      with:
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: vcluster-job
+          namespace: krateo-system
+        set:
+          - name: spec.template.spec.restartPolicy
+            value: OnFailure
+          - name: spec.template.spec.serviceAccount
+            value: vcluster-job-sa
+          - name: spec.template.spec.containers[0].name
+            value: prepare-vcluster
+          - name: spec.template.spec.containers[0].image
+            value: ghcr.io/loft-sh/vcluster-cli:0.19.5
+          - name: spec.template.spec.containers[0].command[0]
+            value: vcluster
+          - name: spec.template.spec.containers[0].args[0]
+            value: connect
+          - name: spec.template.spec.containers[0].args[1]
+            value: vcluster-k8s
+          - name: spec.template.spec.containers[0].args[2]
+            value: --namespace
+          - name: spec.template.spec.containers[0].args[3]
+            value: krateo-system
+          - name: spec.template.spec.containers[0].args[4]
+            value: --debug
+          - name: spec.template.spec.containers[0].args[5]
+            value: --
+          - name: spec.template.spec.containers[0].args[6]
+            value: kubectl
+          - name: spec.template.spec.containers[0].args[7]
+            value: create
+          - name: spec.template.spec.containers[0].args[8]
+            value: secret
+          - name: spec.template.spec.containers[0].args[9]
+            value: generic
+          - name: spec.template.spec.containers[0].args[10]
+            value: vcluster-k8s-certs
+          - name: spec.template.spec.containers[0].args[11]
+            value: --from-literal
+          - name: spec.template.spec.containers[0].args[12]
+            value: ca\.crt\=$KUBECONFIG_CACRT
+          - name: spec.template.spec.containers[0].args[13]
+            value: --namespace
+          - name: spec.template.spec.containers[0].args[14]
+            value: krateo-system

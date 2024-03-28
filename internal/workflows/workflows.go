@@ -44,9 +44,9 @@ func New(rc *rest.Config, ns string, verbose bool) (*Workflow, error) {
 		env:     env,
 		ns:      ns,
 		reg: map[v1alpha1.StepType]steps.Handler{
-			v1alpha1.TypeVar:    steps.VarHandler(dyn, env),
-			v1alpha1.TypeObject: steps.ObjectHandler(app, del, env),
-			v1alpha1.TypeChart:  steps.ChartHandler(cli, env),
+			v1alpha1.TypeVar:    steps.VarHandler(dyn, env, verbose),
+			v1alpha1.TypeObject: steps.ObjectHandler(app, del, env, verbose),
+			v1alpha1.TypeChart:  steps.ChartHandler(cli, env, verbose),
 		},
 	}, nil
 }
@@ -69,14 +69,14 @@ func (r *StepResult) Err() error {
 	return r.err
 }
 
-func Err(results []StepResult) (string, error) {
+func Err(results []StepResult) error {
 	for _, x := range results {
 		if x.Err() != nil {
-			return x.ID(), x.Err()
+			return fmt.Errorf("%s: %w", x.ID(), x.Err())
 		}
 	}
 
-	return "", nil
+	return nil
 }
 
 type Workflow struct {

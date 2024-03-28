@@ -10,6 +10,7 @@ import (
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
+	"github.com/krateoplatformops/installer/internal/expand"
 	"github.com/krateoplatformops/installer/internal/helmclient"
 	"github.com/krateoplatformops/installer/internal/helmclient/values"
 	"github.com/krateoplatformops/installer/internal/ptr"
@@ -17,19 +18,29 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func ChartHandler(cli helmclient.Client, env *cache.Cache[string, string]) Handler {
+func ChartHandler(cli helmclient.Client, env *cache.Cache[string, string], verbose bool) Handler {
 	return &chartStepHandler{
 		cli: cli, env: env,
+		subst: func(k string) string {
+			if v, ok := env.Get(k); ok {
+				return v
+			}
+
+			return "$" + k
+		},
+		verbose: verbose,
 	}
 }
 
 var _ Handler = (*chartStepHandler)(nil)
 
 type chartStepHandler struct {
-	cli helmclient.Client
-	env *cache.Cache[string, string]
-	ns  string
-	op  Op
+	cli     helmclient.Client
+	env     *cache.Cache[string, string]
+	ns      string
+	op      Op
+	subst   func(k string) string
+	verbose bool
 }
 
 func (r *chartStepHandler) Namespace(ns string) {
@@ -41,27 +52,29 @@ func (r *chartStepHandler) Op(op Op) {
 }
 
 func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) error {
-	spec, err := r.toChartSpec(ext)
+	spec, err := r.toChartSpec(id, ext)
 	if err != nil {
 		return err
 	}
 
-	if r.op == Delete {
-		err := r.cli.UninstallRelease(spec)
-		if err != nil {
-			log.Printf("WARN: %s (%s)", err.Error(), spec.ChartName)
-			if strings.Contains(err.Error(), "release: not found") {
-				err = nil
-			}
+	if r.op != Delete {
+		_, err = r.cli.InstallOrUpgradeChart(ctx, spec, nil)
+		return err
+	}
+
+	err = r.cli.UninstallRelease(spec)
+	if err != nil {
+		log.Printf("WARN: %s (%s)", err.Error(), spec.ChartName)
+		if strings.Contains(err.Error(), "release: not found") {
+			return nil
 		}
 		return err
 	}
 
-	_, err = r.cli.InstallOrUpgradeChart(ctx, spec, nil)
-	return err
+	return nil
 }
 
-func (r *chartStepHandler) toChartSpec(ext *runtime.RawExtension) (*helmclient.ChartSpec, error) {
+func (r *chartStepHandler) toChartSpec(id string, ext *runtime.RawExtension) (*helmclient.ChartSpec, error) {
 	res := v1alpha1.ChartSpec{}
 	err := json.Unmarshal(ext.Raw, &res)
 	if err != nil {
@@ -94,10 +107,26 @@ func (r *chartStepHandler) toChartSpec(ext *runtime.RawExtension) (*helmclient.C
 		UpgradeCRDs:     true,
 		Wait:            ptr.Deref(res.Wait, true),
 		ValuesOptions: values.Options{
-			Values: resolveVars(res.Set, r.env),
+			Values: r.resolveVars(id, res.Set),
 		},
 		Timeout: timeout,
 	}
 
 	return spec, nil
+}
+
+func (r *chartStepHandler) resolveVars(id string, res []*v1alpha1.Data) []string {
+	all := make([]string, len(res))
+	for i, el := range res {
+		if len(el.Value) > 0 {
+			val := expand.Expand(el.Value, "", r.subst)
+			all[i] = fmt.Sprintf("%s=%s", el.Name, val)
+			if r.verbose {
+				log.Printf("DBG [chart:%s]: set (name: %s, value: %s)",
+					id, el.Name, ellipsis(strval(val), 20))
+			}
+		}
+	}
+
+	return all
 }

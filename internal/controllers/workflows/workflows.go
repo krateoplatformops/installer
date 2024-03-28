@@ -2,7 +2,6 @@ package workflows
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"k8s.io/client-go/rest"
@@ -30,7 +29,7 @@ const (
 	errNotCR = "managed resource is not a KrateoPlatformOps custom resource"
 
 	creationGracePeriod = 2 * time.Minute
-	reconcileTimeout    = 20 * time.Minute
+	reconcileTimeout    = 10 * time.Minute
 )
 
 func Setup(mgr ctrl.Manager, o controller.Options) error {
@@ -99,9 +98,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 		return reconciler.ExternalObservation{}, errors.New(errNotCR)
 	}
 
-	verbose := meta.IsVerbose(cr)
-
-	got := currentDigestMap(cr)
+	got := ptr.Deref(cr.Status.Digest, "")
 	if len(got) == 0 {
 		return reconciler.ExternalObservation{
 			ResourceExists:   false,
@@ -109,20 +106,17 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 		}, nil
 	}
 
-	exp := listOfStepIdToUpdate(cr)
-	if verbose {
-		e.log.Debug("List of step to update", "tot", len(exp), "list", strings.Join(exp, ","))
-	}
+	exp := digestForSteps(cr)
 
-	if len(exp) == 0 {
+	upToDate := (exp == got)
+	if upToDate {
 		cr.SetConditions(rtv1.Available())
-
-		err := e.kube.Status().Update(ctx, cr)
+		//err := e.kube.Status().Update(ctx, cr)
 
 		return reconciler.ExternalObservation{
 			ResourceExists:   true,
 			ResourceUpToDate: true,
-		}, err
+		}, nil
 	}
 
 	return reconciler.ExternalObservation{
@@ -152,30 +146,13 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		return false
 	})
-	if id, err := workflows.Err(results); err != nil {
-		e.log.Debug("Worflow failure", "step-id", id, "error", err.Error())
+	if err := workflows.Err(results); err != nil {
+		e.log.Debug("Worflow failure", "error", err.Error())
 		return err
 	}
 
-	cr.Status.Steps = make(map[string]v1alpha1.StepStatus)
-
-	available := true
-	for _, x := range results {
-		nfo := v1alpha1.StepStatus{
-			ID:     ptr.To(x.ID()),
-			Digest: ptr.To(x.Digest()),
-		}
-		if err := x.Err(); err != nil {
-			nfo.Err = ptr.To(err.Error())
-			available = false
-		}
-
-		cr.Status.Steps[x.ID()] = nfo
-	}
-
-	if available {
-		cr.SetConditions(rtv1.Available())
-	}
+	cr.Status.SetConditions(rtv1.Available())
+	cr.Status.Digest = ptr.To(digestForSteps(cr))
 
 	return e.kube.Status().Update(ctx, cr)
 }
@@ -195,53 +172,17 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 		return nil
 	}
 
-	all := listOfStepIdToUpdate(cr)
-	if len(all) == 0 {
-		return nil
-	}
-
-	verbose := meta.IsVerbose(cr)
-	if verbose {
-		e.log.Debug("Step(s) to update", "ids", strings.Join(all, ","))
-	}
-
 	e.wf.Op(steps.Update)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
-		for _, id := range all {
-			if id == s.ID {
-				if verbose {
-					e.log.Debug("Step must NOT be skipped", "id", s.ID)
-				}
-				return false
-			}
-		}
-		return true
+		return false
 	})
-
-	if id, err := workflows.Err(results); err != nil {
-		e.log.Debug("Worflow failure", "step-id", id, "error", err.Error())
+	if err := workflows.Err(results); err != nil {
+		e.log.Debug("Worflow failure", "error", err.Error())
 		return err
 	}
 
-	cr.Status.Steps = make(map[string]v1alpha1.StepStatus)
-
-	available := true
-	for _, x := range results {
-		nfo := v1alpha1.StepStatus{
-			ID:     ptr.To(x.ID()),
-			Digest: ptr.To(x.Digest()),
-		}
-		if err := x.Err(); err != nil {
-			nfo.Err = ptr.To(err.Error())
-			available = false
-		}
-
-		cr.Status.Steps[x.ID()] = nfo
-	}
-
-	if available {
-		cr.SetConditions(rtv1.Available())
-	}
+	cr.Status.SetConditions(rtv1.Available())
+	cr.Status.Digest = ptr.To(digestForSteps(cr))
 
 	return e.kube.Status().Update(ctx, cr)
 }
@@ -257,18 +198,19 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return nil
 	}
 
+	if meta.WasDeleted(cr) {
+		return nil
+	}
+
 	e.wf.Op(steps.Delete)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		return s.Type == v1alpha1.TypeVar
 	})
 
-	id, err := workflows.Err(results)
+	err := workflows.Err(results)
 	if err != nil {
-		e.log.Debug("Worflow delete failure", "step-id", id, "error", err.Error())
-		return err
+		e.log.Debug("Worflow failure", "op", "delete", "error", err.Error())
 	}
 
-	cr.Status.Steps = make(map[string]workflowsv1alpha1.StepStatus)
-
-	return e.kube.Status().Update(ctx, cr)
+	return err
 }
