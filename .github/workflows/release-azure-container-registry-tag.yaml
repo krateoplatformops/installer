@@ -1,11 +1,11 @@
-name: release
+name: release-azure-container-registry-tag
 
 on:
   push:
     tags: [ '[0-9]+.[0-9]+.[0-9]+' ]
 
 env:
-  REGISTRY: ghcr.io
+  REGISTRY: cnabregistrykrateo.azurecr.io
 
 jobs:
   package-amd64:
@@ -30,8 +30,8 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.AZURE_CLIENT_ID }}
+          password: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Build docker image and push
         id: docker_build_amd64
@@ -78,8 +78,8 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.AZURE_CLIENT_ID }}
+          password: ${{ secrets.AZURE_CLIENT_SECRET}}
 
       - name: Build docker image and push
         id: docker_build_arm64
