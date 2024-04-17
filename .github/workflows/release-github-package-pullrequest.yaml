@@ -1,4 +1,4 @@
-name: release-github-package-tag
+name: release-github-package-pullrequest
 
 on:
   pull_request:
