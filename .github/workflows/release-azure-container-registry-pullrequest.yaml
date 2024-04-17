@@ -52,7 +52,7 @@ jobs:
         id: docker_build_amd64
         uses: docker/build-push-action@v4
         with:
-          push: false
+          push: true
           platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
