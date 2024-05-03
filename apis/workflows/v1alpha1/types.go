@@ -12,8 +12,9 @@ import (
 )
 
 type Data struct {
-	Name  string `json:"name"`
-	Value string `json:"value,omitempty"`
+	Name     string `json:"name"`
+	Value    string `json:"value,omitempty"`
+	AsString *bool  `json:"asString,omitempty"`
 }
 
 type ObjectMeta struct {

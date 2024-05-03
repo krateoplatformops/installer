@@ -106,21 +106,27 @@ func (r *chartStepHandler) toChartSpec(id string, ext *runtime.RawExtension) (*h
 		CreateNamespace: true,
 		UpgradeCRDs:     true,
 		Wait:            ptr.Deref(res.Wait, true),
-		ValuesOptions: values.Options{
-			Values: r.resolveVars(id, res.Set),
-		},
-		Timeout: timeout,
+		ValuesOptions:   r.valuesOptions(id, res.Set),
+		Timeout:         timeout,
 	}
 
 	return spec, nil
 }
 
-func (r *chartStepHandler) resolveVars(id string, res []*v1alpha1.Data) []string {
-	all := make([]string, len(res))
-	for i, el := range res {
+func (r *chartStepHandler) valuesOptions(id string, res []*v1alpha1.Data) (opts values.Options) {
+	opts.StringValues = []string{}
+	opts.Values = []string{}
+
+	for _, el := range res {
 		if len(el.Value) > 0 {
 			val := expand.Expand(el.Value, "", r.subst)
-			all[i] = fmt.Sprintf("%s=%s", el.Name, val)
+			line := fmt.Sprintf("%s=%s", el.Name, val)
+			if ptr.Deref(el.AsString, false) {
+				opts.StringValues = append(opts.StringValues, line)
+			} else {
+				opts.Values = append(opts.Values, line)
+			}
+
 			if r.verbose {
 				log.Printf("DBG [chart:%s]: set (name: %s, value: %s)",
 					id, el.Name, ellipsis(strval(val), 20))
@@ -128,5 +134,5 @@ func (r *chartStepHandler) resolveVars(id string, res []*v1alpha1.Data) []string
 		}
 	}
 
-	return all
+	return opts
 }
