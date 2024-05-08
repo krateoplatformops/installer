@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -54,8 +56,11 @@ func main() {
 	)
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
+	log.Default().SetOutput(io.Discard)
+	ctrl.SetLogger(zap.New(zap.WriteTo(io.Discard)))
+
 	zl := zap.New(zap.UseDevMode(*debug))
-	log := logging.NewLogrLogger(zl.WithName(fmt.Sprintf("%s-provider", strcase.KebabCase(providerName))))
+	logr := logging.NewLogrLogger(zl.WithName(fmt.Sprintf("%s-provider", strcase.KebabCase(providerName))))
 	if *debug {
 		// The controller-runtime runs with a no-op logger by default. It is
 		// *very* verbose even at info level, so we only provide it a real
@@ -63,7 +68,7 @@ func main() {
 		ctrl.SetLogger(zl)
 	}
 
-	log.Debug("Starting", "sync-period", syncPeriod.String(), "poll-interval", pollInterval.String())
+	logr.Debug("Starting", "sync-period", syncPeriod.String(), "poll-interval", pollInterval.String())
 
 	cfg, err := ctrl.GetConfig()
 	kingpin.FatalIfError(err, "Cannot get API server rest config")
@@ -85,7 +90,7 @@ func main() {
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 
 	o := controller.Options{
-		Logger:                  log,
+		Logger:                  logr,
 		MaxConcurrentReconciles: *maxReconcileRate,
 		PollInterval:            *pollInterval,
 		GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),

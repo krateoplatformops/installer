@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
 	"github.com/krateoplatformops/installer/internal/dynamic"
 	"github.com/krateoplatformops/installer/internal/expand"
+	"github.com/krateoplatformops/provider-runtime/pkg/logging"
 	"helm.sh/helm/v3/pkg/strvals"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,7 +20,7 @@ import (
 
 var _ Handler = (*objStepHandler)(nil)
 
-func ObjectHandler(app *dynamic.Applier, del *dynamic.Deletor, env *cache.Cache[string, string], verbose bool) Handler {
+func ObjectHandler(app *dynamic.Applier, del *dynamic.Deletor, env *cache.Cache[string, string], logr logging.Logger) Handler {
 	return &objStepHandler{
 		app: app, del: del, env: env,
 		subst: func(k string) string {
@@ -30,18 +30,18 @@ func ObjectHandler(app *dynamic.Applier, del *dynamic.Deletor, env *cache.Cache[
 
 			return "$" + k
 		},
-		verbose: verbose,
+		logr: logr,
 	}
 }
 
 type objStepHandler struct {
-	app     *dynamic.Applier
-	del     *dynamic.Deletor
-	env     *cache.Cache[string, string]
-	ns      string
-	op      Op
-	subst   func(k string) string
-	verbose bool
+	app   *dynamic.Applier
+	del   *dynamic.Deletor
+	env   *cache.Cache[string, string]
+	ns    string
+	op    Op
+	subst func(k string) string
+	logr  logging.Logger
 }
 
 func (r *objStepHandler) Namespace(ns string) {
@@ -119,9 +119,10 @@ func (r *objStepHandler) resolveVars(id string, res []*v1alpha1.Data) []string {
 			val := expand.Expand(el.Value, "", r.subst)
 			all[i] = fmt.Sprintf("%s=%s", el.Name, val)
 
-			if r.verbose && r.op != Delete {
-				log.Printf("DBG [object:%s]: prop (name: %s, value: %s)",
-					id, el.Name, ellipsis(val, 20))
+			if r.op != Delete {
+				r.logr.Debug(fmt.Sprintf(
+					"DBG [object:%s]: prop (name: %s, value: %s)",
+					id, el.Name, ellipsis(val, 20)))
 			}
 		}
 	}

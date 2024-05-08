@@ -3,16 +3,16 @@ package workflows
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
 	"github.com/krateoplatformops/installer/internal/dynamic"
 	"github.com/krateoplatformops/installer/internal/workflows/steps"
+	"github.com/krateoplatformops/provider-runtime/pkg/logging"
 	"k8s.io/client-go/rest"
 )
 
-func New(rc *rest.Config, ns string, verbose bool) (*Workflow, error) {
+func New(rc *rest.Config, ns string, logr logging.Logger) (*Workflow, error) {
 	dyn, err := dynamic.NewGetter(rc)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func New(rc *rest.Config, ns string, verbose bool) (*Workflow, error) {
 	cli, err := newHelmClient(helmClientOptions{
 		namespace:  ns,
 		restConfig: rc,
-		verbose:    verbose,
+		logr:       logr,
 	})
 	if err != nil {
 		return nil, err
@@ -40,13 +40,13 @@ func New(rc *rest.Config, ns string, verbose bool) (*Workflow, error) {
 	env := cache.New[string, string]()
 
 	return &Workflow{
-		verbose: verbose,
-		env:     env,
-		ns:      ns,
+		logr: logr,
+		env:  env,
+		ns:   ns,
 		reg: map[v1alpha1.StepType]steps.Handler{
-			v1alpha1.TypeVar:    steps.VarHandler(dyn, env, verbose),
-			v1alpha1.TypeObject: steps.ObjectHandler(app, del, env, verbose),
-			v1alpha1.TypeChart:  steps.ChartHandler(cli, env, verbose),
+			v1alpha1.TypeVar:    steps.VarHandler(dyn, env, logr),
+			v1alpha1.TypeObject: steps.ObjectHandler(app, del, env, logr),
+			v1alpha1.TypeChart:  steps.ChartHandler(cli, env, logr),
 		},
 	}, nil
 }
@@ -80,15 +80,11 @@ func Err(results []StepResult) error {
 }
 
 type Workflow struct {
-	verbose bool
-	ns      string
-	env     *cache.Cache[string, string]
-	reg     map[v1alpha1.StepType]steps.Handler
-	op      steps.Op
-}
-
-func (wf *Workflow) Verbose() bool {
-	return wf.verbose
+	logr logging.Logger
+	ns   string
+	env  *cache.Cache[string, string]
+	reg  map[v1alpha1.StepType]steps.Handler
+	op   steps.Op
 }
 
 func (wf *Workflow) Op(op steps.Op) {
@@ -100,15 +96,11 @@ func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec, skip f
 
 	for i, x := range spec.Steps {
 		if skip(x) {
-			if wf.verbose {
-				log.Printf("skipping step with id: %s (%v)", x.ID, x.Type)
-			}
+			wf.logr.Info(fmt.Sprintf("skipping step with id: %s (%v)", x.ID, x.Type))
 			continue
 		}
 
-		if wf.verbose {
-			log.Printf("executing step with id: %s (%v)", x.ID, x.Type)
-		}
+		wf.logr.Info(fmt.Sprintf("executing step with id: %s (%v)", x.ID, x.Type))
 
 		results[i] = StepResult{id: x.ID}
 

@@ -1,9 +1,6 @@
 package controllers
 
 import (
-	"log"
-	"os"
-
 	"github.com/krateoplatformops/provider-runtime/pkg/controller"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -11,8 +8,6 @@ import (
 )
 
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	log.SetOutput(os.Stderr)
-
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		workflows.Setup,
 	} {

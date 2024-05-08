@@ -2,19 +2,24 @@ package workflows
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/krateoplatformops/installer/internal/helmclient"
+	"github.com/krateoplatformops/provider-runtime/pkg/logging"
 	"k8s.io/client-go/rest"
 )
 
 type helmClientOptions struct {
 	namespace  string
 	restConfig *rest.Config
+	logr       logging.Logger
 	verbose    bool
 }
 
 func newHelmClient(opts helmClientOptions) (helmclient.Client, error) {
+	l := logging.NewNopLogger()
+	if opts.logr != nil {
+		l = opts.logr.WithValues("namespace", opts.namespace)
+	}
 	ho := &helmclient.Options{
 		Namespace:        opts.namespace,
 		RepositoryCache:  "/tmp/.helmcache",
@@ -23,7 +28,7 @@ func newHelmClient(opts helmClientOptions) (helmclient.Client, error) {
 		Linting:          false,
 		DebugLog: func(format string, v ...interface{}) {
 			if opts.verbose {
-				log.Printf("DBG: %s", fmt.Sprintf(format, v...))
+				l.Debug(fmt.Sprintf("DBG: %s", fmt.Sprintf(format, v...)))
 			}
 		},
 	}
