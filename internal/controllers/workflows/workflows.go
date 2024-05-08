@@ -9,7 +9,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	workflowsv1alpha1 "github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/ptr"
 	"github.com/krateoplatformops/installer/internal/workflows"
@@ -72,7 +71,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (reconcile
 		return nil, errors.New(errNotCR)
 	}
 
-	wf, err := workflows.New(c.rc, cr.GetNamespace(), meta.IsVerbose(cr))
+	wf, err := workflows.New(c.rc, cr.GetNamespace(), c.log.WithValues("workflow", cr.GetName()))
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +203,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 
 	e.wf.Op(steps.Delete)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
-		return s.Type == v1alpha1.TypeVar
+		return s.Type == workflowsv1alpha1.TypeVar
 	})
 
 	err := workflows.Err(results)

@@ -66,11 +66,11 @@ func TestObjectDelete(t *testing.T) {
 	env.Set("KUBECONFIG_CAKEY", "XXXXX")
 
 	oh := &objStepHandler{
-		del:     del,
-		env:     env,
-		ns:      "krateo-system",
-		op:      Delete,
-		verbose: true,
+		del:  del,
+		env:  env,
+		ns:   "krateo-system",
+		op:   Delete,
+		logr: stdoutLogger(),
 	}
 
 	err = oh.Handle(context.TODO(), "test", &runtime.RawExtension{

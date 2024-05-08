@@ -1,13 +1,20 @@
+//go:build integration
+// +build integration
+
 package steps
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/funcr"
 	"github.com/krateoplatformops/installer/internal/helmclient"
+	"github.com/krateoplatformops/provider-runtime/pkg/logging"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -64,4 +71,18 @@ func loadSample(fn string) ([]byte, error) {
 	defer fin.Close()
 
 	return io.ReadAll(fin)
+}
+
+func stdoutLogger() logging.Logger {
+	return logging.NewLogrLogger(newStdoutLogger())
+}
+
+func newStdoutLogger() logr.Logger {
+	return funcr.New(func(prefix, args string) {
+		if prefix != "" {
+			fmt.Printf("%s: %s\n", prefix, args)
+		} else {
+			fmt.Println(args)
+		}
+	}, funcr.Options{})
 }

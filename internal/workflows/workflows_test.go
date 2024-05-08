@@ -12,8 +12,10 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/funcr"
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
-	"github.com/krateoplatformops/provider-runtime/pkg/meta"
+	"github.com/krateoplatformops/provider-runtime/pkg/logging"
 	"k8s.io/apimachinery/pkg/runtime"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/rest"
@@ -36,7 +38,7 @@ func TestWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wf, err := New(rc, res.GetNamespace(), meta.IsVerbose(res))
+	wf, err := New(rc, res.GetNamespace(), stdoutLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,4 +111,18 @@ func newRestConfig() (*rest.Config, error) {
 	}
 
 	return clientcmd.BuildConfigFromFlags("", filepath.Join(home, ".kube", "config"))
+}
+
+func stdoutLogger() logging.Logger {
+	return logging.NewLogrLogger(newStdoutLogger())
+}
+
+func newStdoutLogger() logr.Logger {
+	return funcr.New(func(prefix, args string) {
+		if prefix != "" {
+			fmt.Printf("%s: %s\n", prefix, args)
+		} else {
+			fmt.Println(args)
+		}
+	}, funcr.Options{})
 }

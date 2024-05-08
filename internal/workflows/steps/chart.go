@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -14,11 +13,12 @@ import (
 	"github.com/krateoplatformops/installer/internal/helmclient"
 	"github.com/krateoplatformops/installer/internal/helmclient/values"
 	"github.com/krateoplatformops/installer/internal/ptr"
+	"github.com/krateoplatformops/provider-runtime/pkg/logging"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func ChartHandler(cli helmclient.Client, env *cache.Cache[string, string], verbose bool) Handler {
+func ChartHandler(cli helmclient.Client, env *cache.Cache[string, string], logr logging.Logger) Handler {
 	return &chartStepHandler{
 		cli: cli, env: env,
 		subst: func(k string) string {
@@ -28,19 +28,19 @@ func ChartHandler(cli helmclient.Client, env *cache.Cache[string, string], verbo
 
 			return "$" + k
 		},
-		verbose: verbose,
+		logr: logr,
 	}
 }
 
 var _ Handler = (*chartStepHandler)(nil)
 
 type chartStepHandler struct {
-	cli     helmclient.Client
-	env     *cache.Cache[string, string]
-	ns      string
-	op      Op
-	subst   func(k string) string
-	verbose bool
+	cli   helmclient.Client
+	env   *cache.Cache[string, string]
+	ns    string
+	op    Op
+	subst func(k string) string
+	logr  logging.Logger
 }
 
 func (r *chartStepHandler) Namespace(ns string) {
@@ -64,7 +64,7 @@ func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.R
 
 	err = r.cli.UninstallRelease(spec)
 	if err != nil {
-		log.Printf("WARN: %s (%s)", err.Error(), spec.ChartName)
+		r.logr.Info(fmt.Sprintf("WARN: %s (%s)", err.Error(), spec.ChartName))
 		if strings.Contains(err.Error(), "release: not found") {
 			return nil
 		}
@@ -127,10 +127,9 @@ func (r *chartStepHandler) valuesOptions(id string, res []*v1alpha1.Data) (opts 
 				opts.Values = append(opts.Values, line)
 			}
 
-			if r.verbose {
-				log.Printf("DBG [chart:%s]: set (name: %s, value: %s)",
-					id, el.Name, ellipsis(strval(val), 20))
-			}
+			r.logr.Debug(fmt.Sprintf(
+				"DBG [chart:%s]: set (name: %s, value: %s)",
+				id, el.Name, ellipsis(strval(val), 20)))
 		}
 	}
 

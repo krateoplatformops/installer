@@ -2,18 +2,15 @@ package steps
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
-
-	"github.com/twmb/murmur3"
 )
 
-func computeDigest(dat []byte) string {
-	hasher := murmur3.New64()
-	hasher.Write(dat)
-	hasher.Sum64()
-	return strconv.FormatUint(hasher.Sum64(), 16)
-}
+// func computeDigest(dat []byte) string {
+// 	hasher := murmur3.New64()
+// 	hasher.Write(dat)
+// 	hasher.Sum64()
+// 	return strconv.FormatUint(hasher.Sum64(), 16)
+// }
 
 func strval(v any) string {
 	switch v := v.(type) {
