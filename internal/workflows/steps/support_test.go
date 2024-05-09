@@ -6,6 +6,7 @@ package steps
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,6 +16,8 @@ import (
 	"github.com/go-logr/logr/funcr"
 	"github.com/krateoplatformops/installer/internal/helmclient"
 	"github.com/krateoplatformops/provider-runtime/pkg/logging"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -85,4 +88,35 @@ func newStdoutLogger() logr.Logger {
 			fmt.Println(args)
 		}
 	}, funcr.Options{})
+}
+
+func loadChart(f fs.FS) (*chart.Chart, error) {
+	files := []*loader.BufferedFile{}
+
+	err := fs.WalkDir(f, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		data, err := fs.ReadFile(f, path)
+		if err != nil {
+			return fmt.Errorf("could not read manifest %s: %w", path, err)
+		}
+
+		files = append(files, &loader.BufferedFile{
+			Name: path,
+			Data: data,
+		})
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not walk chart directory: %w", err)
+	}
+
+	return loader.LoadFiles(files)
 }

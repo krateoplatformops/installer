@@ -128,7 +128,7 @@ func (r *chartStepHandler) valuesOptions(id string, res []*v1alpha1.Data) (opts 
 			}
 
 			r.logr.Debug(fmt.Sprintf(
-				"DBG [chart:%s]: set (name: %s, value: %s)",
+				"[chart:%s]: set (name: %s, value: %s)",
 				id, el.Name, ellipsis(strval(val), 20)))
 		}
 	}
