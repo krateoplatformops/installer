@@ -1,0 +1,8 @@
+labels:
+  some: default
+
+sftp:
+  allowedMAC: xxx
+
+env:
+  KRATEO_GATEWAY_DNS_NAMES: yyy
