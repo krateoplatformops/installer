@@ -18,29 +18,41 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func ChartHandler(cli helmclient.Client, env *cache.Cache[string, string], logr logging.Logger) Handler {
-	return &chartStepHandler{
-		cli: cli, env: env,
-		subst: func(k string) string {
-			if v, ok := env.Get(k); ok {
-				return v
-			}
+type ChartHandlerOptions struct {
+	HelmClient helmclient.Client
+	Env        *cache.Cache[string, string]
+	Log        logging.Logger
+	Render     bool
+}
 
-			return "$" + k
-		},
-		logr: logr,
+func ChartHandler(opts ChartHandlerOptions) Handler {
+	hdl := &chartStepHandler{
+		cli:    opts.HelmClient,
+		env:    opts.Env,
+		logr:   opts.Log,
+		render: opts.Render,
 	}
+	hdl.subst = func(k string) string {
+		if v, ok := hdl.env.Get(k); ok {
+			return v
+		}
+
+		return "$" + k
+	}
+
+	return hdl
 }
 
 var _ Handler = (*chartStepHandler)(nil)
 
 type chartStepHandler struct {
-	cli   helmclient.Client
-	env   *cache.Cache[string, string]
-	ns    string
-	op    Op
-	subst func(k string) string
-	logr  logging.Logger
+	cli    helmclient.Client
+	env    *cache.Cache[string, string]
+	ns     string
+	op     Op
+	subst  func(k string) string
+	render bool
+	logr   logging.Logger
 }
 
 func (r *chartStepHandler) Namespace(ns string) {
@@ -55,6 +67,15 @@ func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.R
 	spec, err := r.toChartSpec(id, ext)
 	if err != nil {
 		return err
+	}
+
+	if r.render {
+		dat, err := r.cli.TemplateChart(spec, &helmclient.HelmTemplateOptions{})
+		if err != nil {
+			r.logr.Debug("Unable to render templates", "error", err.Error())
+		} else {
+			r.logr.Debug(string(dat), "id", id)
+		}
 	}
 
 	if r.op != Delete {

@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func New(rc *rest.Config, ns string, logr logging.Logger) (*Workflow, error) {
+func New(rc *rest.Config, ns string, logr logging.Logger, render bool) (*Workflow, error) {
 	dyn, err := dynamic.NewGetter(rc)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,12 @@ func New(rc *rest.Config, ns string, logr logging.Logger) (*Workflow, error) {
 		reg: map[v1alpha1.StepType]steps.Handler{
 			v1alpha1.TypeVar:    steps.VarHandler(dyn, env, logr),
 			v1alpha1.TypeObject: steps.ObjectHandler(app, del, env, logr),
-			v1alpha1.TypeChart:  steps.ChartHandler(cli, env, logr),
+			v1alpha1.TypeChart: steps.ChartHandler(steps.ChartHandlerOptions{
+				HelmClient: cli,
+				Env:        env,
+				Log:        logr,
+				Render:     render,
+			}),
 		},
 	}, nil
 }
