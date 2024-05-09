@@ -31,6 +31,11 @@ func TestChartTemplate(t *testing.T) {
 			AsString: ptr.To(true),
 		},
 		{
+			Name:     "securityContext.runAsUser",
+			Value:    "null",
+			AsString: ptr.To(true),
+		},
+		{
 			Name:  "env.KRATEO_GATEWAY_DNS_NAMES",
 			Value: "{krateo-gateway.sticz.svc,$KRATEO_GATEWAY_INGRESS_HOST}",
 		},

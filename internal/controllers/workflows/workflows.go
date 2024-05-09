@@ -71,7 +71,11 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (reconcile
 		return nil, errors.New(errNotCR)
 	}
 
-	wf, err := workflows.New(c.rc, cr.GetNamespace(), c.log.WithValues("workflow", cr.GetName()))
+	wf, err := workflows.New(c.rc,
+		cr.GetNamespace(),
+		c.log.WithValues("workflow", cr.GetName()),
+		meta.IsVerbose(cr),
+	)
 	if err != nil {
 		return nil, err
 	}

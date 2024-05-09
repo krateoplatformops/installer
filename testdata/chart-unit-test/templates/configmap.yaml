@@ -10,4 +10,6 @@ metadata:
 data:
   allowedMACs: {{ .Values.sftp.allowedMACs }}
   KRATEO_GATEWAY_DNS_NAMES: {{ .Values.env.KRATEO_GATEWAY_DNS_NAMES }}
-  something: something
+  securityContext:
+    runAsUser: {{ .Values.securityContext.runAsUser }}
+  
