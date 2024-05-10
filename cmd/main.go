@@ -32,6 +32,7 @@ func main() {
 		app = kingpin.New(filepath.Base(os.Args[0]), fmt.Sprintf("Krateo %s Provider.", providerName)).
 			DefaultEnvars()
 		debug = app.Flag("debug", "Run with debug logging.").Short('d').
+			Default("true").
 			OverrideDefaultFromEnvar(fmt.Sprintf("%s_DEBUG", envVarPrefix)).
 			Bool()
 		namespace = app.Flag("namespace", "Watch resources only in this namespace.").Short('n').
