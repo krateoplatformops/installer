@@ -38,7 +38,7 @@ func TestWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wf, err := New(rc, res.GetNamespace(), stdoutLogger(), true)
+	wf, err := New(rc, res.GetNamespace(), stdoutLogger())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,15 +22,13 @@ type ChartHandlerOptions struct {
 	HelmClient helmclient.Client
 	Env        *cache.Cache[string, string]
 	Log        logging.Logger
-	Render     bool
 }
 
 func ChartHandler(opts ChartHandlerOptions) Handler {
 	hdl := &chartStepHandler{
-		cli:    opts.HelmClient,
-		env:    opts.Env,
-		logr:   opts.Log,
-		render: opts.Render,
+		cli:  opts.HelmClient,
+		env:  opts.Env,
+		logr: opts.Log,
 	}
 	hdl.subst = func(k string) string {
 		if v, ok := hdl.env.Get(k); ok {
@@ -67,15 +65,6 @@ func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.R
 	spec, err := r.toChartSpec(id, ext)
 	if err != nil {
 		return err
-	}
-
-	if r.render {
-		dat, err := r.cli.TemplateChart(spec, &helmclient.HelmTemplateOptions{})
-		if err != nil {
-			r.logr.Debug("Unable to render templates", "error", err.Error())
-		} else {
-			r.logr.Debug(string(dat), "id", id)
-		}
 	}
 
 	if r.op != Delete {
