@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func New(rc *rest.Config, ns string, logr logging.Logger, render bool) (*Workflow, error) {
+func New(rc *rest.Config, ns string, logr logging.Logger) (*Workflow, error) {
 	dyn, err := dynamic.NewGetter(rc)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,6 @@ func New(rc *rest.Config, ns string, logr logging.Logger, render bool) (*Workflo
 				HelmClient: cli,
 				Env:        env,
 				Log:        logr,
-				Render:     render,
 			}),
 		},
 	}, nil
