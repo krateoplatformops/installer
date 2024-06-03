@@ -6,6 +6,7 @@ package steps
 import (
 	"fmt"
 	"os"
+
 	"testing"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
