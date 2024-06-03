@@ -28,11 +28,15 @@ func strval(v any) string {
 }
 
 func deriveRepoName(repoUrl string) string {
-	idx := strings.LastIndexByte(repoUrl, '.')
-	if idx > 0 {
-		idx = strings.LastIndexByte(repoUrl[0:idx], '.')
+
+	idx1 := strings.LastIndexByte(repoUrl, '.')
+	idx2 := strings.LastIndexByte(repoUrl, '/')
+	if idx1 > idx2 {
+		idx := strings.LastIndexByte(repoUrl[0:idx1], '.')
+		return strings.ReplaceAll(repoUrl[idx+1:], ".", "-")
 	}
-	return strings.ReplaceAll(repoUrl[idx+1:], ".", "-")
+
+	return strings.ReplaceAll(repoUrl[idx2+1:], ".", "-")
 }
 
 // Ending ellipsis a long string s -> "front..."
