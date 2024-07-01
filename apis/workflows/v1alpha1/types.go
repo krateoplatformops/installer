@@ -33,6 +33,11 @@ type Var struct {
 	ValueFrom *ValueFromSource `json:"valueFrom,omitempty"`
 }
 
+type Credentials struct {
+	Username    string                 `json:"username"`
+	PasswordRef prv1.SecretKeySelector `json:"passwordRef"`
+}
+
 type ChartSpec struct {
 	// Repository: Helm repository URL, required if ChartSpec.URL not set
 	Repository string `json:"repository,omitempty"`
@@ -42,8 +47,8 @@ type ChartSpec struct {
 	Version string `json:"version,omitempty"`
 	// URL to chart package (typically .tgz), optional and overrides others fields in the spec
 	URL string `json:"url,omitempty"`
-	// PullSecretRef is reference to the secret containing credentials to helm repository
-	PullSecretRef prv1.SecretKeySelector `json:"pullSecretRef,omitempty"`
+	// // PullSecretRef is reference to the secret containing credentials to helm repository
+	// PullSecretRef prv1.SecretKeySelector `json:"pullSecretRef,omitempty"`
 
 	// Namespace to install the release into.
 	//Namespace string `json:"namespace"`
@@ -60,6 +65,10 @@ type ChartSpec struct {
 	//SkipCRDs bool `json:"skipCRDs,omitempty"`
 	// InsecureSkipTLSVerify skips tls certificate checks for the chart download
 	InsecureSkipTLSVerify *bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// Credentials: credentials for private repos
+	// +optional
+	Credentials *Credentials `json:"credentials,omitempty"`
 }
 
 type ChartObservation struct {
