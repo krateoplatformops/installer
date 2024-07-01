@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 
+	helmgetter "github.com/krateoplatformops/installer/internal/helm/getter"
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/spf13/pflag"
@@ -302,10 +303,24 @@ func (c *HelmClient) install(ctx context.Context, spec *ChartSpec, opts *Generic
 		}
 	}
 
-	helmChart, chartPath, err := c.GetChart(spec.ChartName, &client.ChartPathOptions)
+	helmChart, chartPath, err := c.GetChartV2(&ChartInfo{
+		Url:                   spec.ChartName,
+		Version:               spec.Version,
+		Repo:                  spec.Repository,
+		InsecureSkipVerifyTLS: spec.InsecureSkipTLSverify,
+		Credentials: &Credentials{
+			Username: spec.Username,
+			Password: spec.Password,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
+
+	// helmChart, chartPath, err := c.GetChart(spec.ChartName, &client.ChartPathOptions)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	if helmChart.Metadata.Type != "" && helmChart.Metadata.Type != "application" {
 		return nil, fmt.Errorf(
@@ -360,10 +375,24 @@ func (c *HelmClient) upgrade(ctx context.Context, spec *ChartSpec, opts *Generic
 		}
 	}
 
-	helmChart, chartPath, err := c.GetChart(spec.ChartName, &client.ChartPathOptions)
+	helmChart, chartPath, err := c.GetChartV2(&ChartInfo{
+		Url:                   spec.ChartName,
+		Version:               spec.Version,
+		Repo:                  spec.Repository,
+		InsecureSkipVerifyTLS: spec.InsecureSkipTLSverify,
+		Credentials: &Credentials{
+			Username: spec.Username,
+			Password: spec.Password,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
+
+	// helmChart, chartPath, err := c.GetChart(spec.ChartName, &client.ChartPathOptions)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	helmChart, err = updateDependencies(helmChart, &client.ChartPathOptions, chartPath, c, client.DependencyUpdate, spec)
 	if err != nil {
@@ -486,10 +515,24 @@ func (c *HelmClient) TemplateChart(spec *ChartSpec, options *HelmTemplateOptions
 		client.Version = ">0.0.0-0"
 	}
 
-	helmChart, chartPath, err := c.GetChart(spec.ChartName, &client.ChartPathOptions)
+	helmChart, chartPath, err := c.GetChartV2(&ChartInfo{
+		Url:                   spec.ChartName,
+		Version:               spec.Version,
+		Repo:                  spec.Repository,
+		InsecureSkipVerifyTLS: spec.InsecureSkipTLSverify,
+		Credentials: &Credentials{
+			Username: spec.Username,
+			Password: spec.Password,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
+
+	// helmChart, chartPath, err := c.GetChart(spec.ChartName, &client.ChartPathOptions)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	if helmChart.Metadata.Type != "" && helmChart.Metadata.Type != "application" {
 		return nil, fmt.Errorf(
@@ -534,12 +577,25 @@ func (c *HelmClient) TemplateChart(spec *ChartSpec, options *HelmTemplateOptions
 
 // LintChart fetches a chart using the provided ChartSpec 'spec' and lints it's values.
 func (c *HelmClient) LintChart(spec *ChartSpec) error {
-	_, chartPath, err := c.GetChart(spec.ChartName, &action.ChartPathOptions{
-		Version: spec.Version,
+	_, chartPath, err := c.GetChartV2(&ChartInfo{
+		Url:                   spec.ChartName,
+		Version:               spec.Version,
+		Repo:                  spec.Repository,
+		InsecureSkipVerifyTLS: spec.InsecureSkipTLSverify,
+		Credentials: &Credentials{
+			Username: spec.Username,
+			Password: spec.Password,
+		},
 	})
 	if err != nil {
 		return err
 	}
+	// _, chartPath, err := c.GetChart(spec.ChartName, &action.ChartPathOptions{
+	// 	Version: spec.Version,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
 	p := getter.All(c.Settings)
 	values, err := spec.GetValuesMap(p)
@@ -771,6 +827,67 @@ func (c *HelmClient) GetChart(chartName string, chartPathOptions *action.ChartPa
 	return helmChart, chartPath, err
 }
 
+type Credentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type ChartInfo struct {
+	// Url: oci or tgz full url
+	// +immutable
+	Url string `json:"url"`
+	// Version: desired chart version
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Version is immutable"
+	// +kubebuilder:validation:MaxLength=20
+	Version string `json:"version,omitempty"`
+	// Repo: helm repo name (for helm repo urls only)
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Repo is immutable"
+	// +kubebuilder:validation:MaxLength=256
+	Repo string `json:"repo,omitempty"`
+
+	// InsecureSkipVerifyTLS: skip tls verification
+	// +optional
+	InsecureSkipVerifyTLS bool `json:"insecureSkipVerifyTLS,omitempty"`
+
+	// Credentials: credentials for private repos
+	// +optional
+	Credentials *Credentials `json:"credentials,omitempty"`
+}
+
+func (c *HelmClient) GetChartV2(spec *ChartInfo) (*chart.Chart, string, error) {
+
+	opts := helmgetter.GetOptions{
+		URI:                   spec.Url,
+		Version:               spec.Version,
+		Repo:                  spec.Repo,
+		InsecureSkipVerifyTLS: spec.InsecureSkipVerifyTLS,
+	}
+
+	if spec.Credentials != nil {
+		opts.Username = spec.Credentials.Username
+		opts.Password = spec.Credentials.Password
+		opts.PassCredentialsAll = true
+	}
+
+	bChart, chartPath, err := helmgetter.Get(opts)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get chart %q: %w", spec.Url, err)
+	}
+
+	helmChart, err := loader.LoadArchive(bytes.NewReader(bChart))
+	if err != nil {
+		return nil, "", err
+	}
+
+	if helmChart.Metadata.Deprecated {
+		c.DebugLog("WARNING: This chart (%q) is deprecated", helmChart.Metadata.Name)
+	}
+
+	return helmChart, chartPath, err
+}
+
 // chartExists checks whether a chart is already installed
 // in a namespace or not based on the provided chart spec.
 // Note that this function only considers the contained chart name and namespace.
@@ -841,10 +958,24 @@ func updateDependencies(helmChart *chart.Chart, chartPathOptions *action.ChartPa
 					return nil, err
 				}
 
-				helmChart, _, err = c.GetChart(spec.ChartName, chartPathOptions)
+				helmChart, _, err = c.GetChartV2(&ChartInfo{
+					Url:                   spec.ChartName,
+					Version:               spec.Version,
+					Repo:                  spec.Repository,
+					InsecureSkipVerifyTLS: spec.InsecureSkipTLSverify,
+					Credentials: &Credentials{
+						Username: spec.Username,
+						Password: spec.Password,
+					},
+				})
 				if err != nil {
 					return nil, err
 				}
+
+				// helmChart, _, err = c.GetChart(spec.ChartName, chartPathOptions)
+				// if err != nil {
+				// 	return nil, err
+				// }
 
 			} else {
 				return nil, err

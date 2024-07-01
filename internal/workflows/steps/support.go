@@ -2,6 +2,7 @@ package steps
 
 import (
 	"fmt"
+	"path"
 	"strings"
 )
 
@@ -25,6 +26,15 @@ func strval(v any) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// write a func to  bring this to krateo-bff https://raw.githubusercontent.com/matteogastaldello/private-charts/main/krateo-bff-0.18.1.tgz
+func deriveReleaseName(repoUrl string) string {
+	releaseName := strings.TrimSuffix(path.Base(repoUrl), ".tgz")
+	versionIndex := strings.LastIndex(releaseName, "-")
+	releaseName = releaseName[:versionIndex]
+
+	return releaseName
 }
 
 func deriveRepoName(repoUrl string) string {
