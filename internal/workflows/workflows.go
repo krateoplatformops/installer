@@ -50,6 +50,7 @@ func New(rc *rest.Config, ns string, logr logging.Logger) (*Workflow, error) {
 				HelmClient: cli,
 				Env:        env,
 				Log:        logr,
+				Dyn:        dyn,
 			}),
 		},
 	}, nil

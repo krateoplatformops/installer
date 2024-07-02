@@ -9,16 +9,18 @@ import (
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
+	"github.com/krateoplatformops/installer/internal/dynamic"
 	"github.com/krateoplatformops/installer/internal/expand"
 	"github.com/krateoplatformops/installer/internal/helmclient"
 	"github.com/krateoplatformops/installer/internal/helmclient/values"
 	"github.com/krateoplatformops/installer/internal/ptr"
+	"github.com/krateoplatformops/installer/internal/resolvers"
 	"github.com/krateoplatformops/provider-runtime/pkg/logging"
-	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type ChartHandlerOptions struct {
+	Dyn        *dynamic.Getter
 	HelmClient helmclient.Client
 	Env        *cache.Cache[string, string]
 	Log        logging.Logger
@@ -29,6 +31,7 @@ func ChartHandler(opts ChartHandlerOptions) Handler {
 		cli:  opts.HelmClient,
 		env:  opts.Env,
 		logr: opts.Log,
+		dyn:  opts.Dyn,
 	}
 	hdl.subst = func(k string) string {
 		if v, ok := hdl.env.Get(k); ok {
@@ -51,6 +54,7 @@ type chartStepHandler struct {
 	subst  func(k string) string
 	render bool
 	logr   logging.Logger
+	dyn    *dynamic.Getter
 }
 
 func (r *chartStepHandler) Namespace(ns string) {
@@ -62,7 +66,7 @@ func (r *chartStepHandler) Op(op Op) {
 }
 
 func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) error {
-	spec, err := r.toChartSpec(id, ext)
+	spec, err := r.toChartSpec(ctx, id, ext)
 	if err != nil {
 		return err
 	}
@@ -84,24 +88,24 @@ func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.R
 	return nil
 }
 
-func (r *chartStepHandler) toChartSpec(id string, ext *runtime.RawExtension) (*helmclient.ChartSpec, error) {
+func (r *chartStepHandler) toChartSpec(ctx context.Context, id string, ext *runtime.RawExtension) (*helmclient.ChartSpec, error) {
 	res := v1alpha1.ChartSpec{}
 	err := json.Unmarshal(ext.Raw, &res)
 	if err != nil {
 		return nil, err
 	}
 
-	entry := repo.Entry{
-		Name: deriveRepoName(res.Repository),
-		URL:  res.Repository,
-	}
+	// entry := repo.Entry{
+	// 	Name: deriveRepoName(res.Repository),
+	// 	URL:  res.Repository,
+	// }
 
-	if r.op != Delete {
-		err = r.cli.AddOrUpdateChartRepo(entry)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// if r.op != Delete {
+	// 	err = r.cli.AddOrUpdateChartRepo(entry)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	timeout := time.Duration(10 * time.Minute)
 	if res.WaitTimeout != nil {
@@ -110,7 +114,7 @@ func (r *chartStepHandler) toChartSpec(id string, ext *runtime.RawExtension) (*h
 
 	spec := &helmclient.ChartSpec{
 		ReleaseName:     res.Name,
-		ChartName:       fmt.Sprintf("%s/%s", entry.Name, res.Name),
+		ChartName:       res.Repository,
 		Namespace:       r.ns,
 		Version:         res.Version,
 		CreateNamespace: true,
@@ -118,6 +122,23 @@ func (r *chartStepHandler) toChartSpec(id string, ext *runtime.RawExtension) (*h
 		Wait:            ptr.Deref(res.Wait, true),
 		ValuesOptions:   r.valuesOptions(id, res.Set),
 		Timeout:         timeout,
+		Repository:      res.Name,
+	}
+	if res.InsecureSkipTLSVerify != nil {
+		spec.InsecureSkipTLSverify = *res.InsecureSkipTLSVerify
+	}
+	if res.URL != "" {
+		spec.ChartName = res.URL
+		spec.ReleaseName = deriveReleaseName(res.URL)
+	}
+
+	if res.Credentials != nil {
+		secret, err := resolvers.GetSecret(ctx, *r.dyn, res.Credentials.PasswordRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get secret: %w", err)
+		}
+		spec.Username = res.Credentials.Username
+		spec.Password = secret
 	}
 
 	return spec, nil

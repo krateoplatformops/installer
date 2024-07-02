@@ -145,6 +145,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 	cr.SetConditions(rtv1.Creating())
 
 	e.wf.Op(steps.Create)
+
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		return false
 	})
