@@ -9,7 +9,7 @@ import (
 
 	"time"
 
-	"github.com/Masterminds/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/davecgh/go-spew/spew"
 	"helm.sh/helm/v3/pkg/registry"
 )
