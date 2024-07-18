@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
 	"github.com/krateoplatformops/installer/internal/dynamic"
 	"github.com/krateoplatformops/installer/internal/expand"
+	"github.com/krateoplatformops/installer/internal/ptr"
 	"github.com/krateoplatformops/provider-runtime/pkg/logging"
 	"helm.sh/helm/v3/pkg/strvals"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -103,8 +103,7 @@ func (r *objStepHandler) toUnstructured(id string, ext *runtime.RawExtension) (*
 		},
 	}
 
-	all := r.resolveVars(id, res.Set)
-	err = strvals.ParseInto(strings.Join(all, ","), src)
+	err = r.resolveVars(id, res.Set, src)
 	if err != nil {
 		return nil, err
 	}
@@ -112,12 +111,22 @@ func (r *objStepHandler) toUnstructured(id string, ext *runtime.RawExtension) (*
 	return &unstructured.Unstructured{Object: src}, nil
 }
 
-func (r *objStepHandler) resolveVars(id string, res []*v1alpha1.Data) []string {
-	all := make([]string, len(res))
-	for i, el := range res {
+func (r *objStepHandler) resolveVars(id string, res []*v1alpha1.Data, src map[string]any) error {
+	for _, el := range res {
 		if len(el.Value) > 0 {
 			val := expand.Expand(el.Value, "", r.subst)
-			all[i] = fmt.Sprintf("%s=%s", el.Name, val)
+			line := fmt.Sprintf("%s=%s", el.Name, val)
+			if ptr.Deref(el.AsString, false) {
+				err := strvals.ParseIntoString(line, src)
+				if err != nil {
+					return err
+				}
+			} else {
+				err := strvals.ParseInto(line, src)
+				if err != nil {
+					return err
+				}
+			}
 
 			if r.op != Delete {
 				r.logr.Debug(fmt.Sprintf(
@@ -127,5 +136,5 @@ func (r *objStepHandler) resolveVars(id string, res []*v1alpha1.Data) []string {
 		}
 	}
 
-	return all
+	return nil
 }

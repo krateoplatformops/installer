@@ -36,6 +36,10 @@ func TestObjectCreate(t *testing.T) {
 		env: env,
 		ns:  "krateo-system",
 		op:  Create,
+		subst: func(k string) string {
+			return k
+		},
+		logr: stdoutLogger(),
 	}
 
 	err = oh.Handle(context.TODO(), "test", &runtime.RawExtension{
@@ -70,6 +74,43 @@ func TestObjectDelete(t *testing.T) {
 		env:  env,
 		ns:   "krateo-system",
 		op:   Delete,
+		logr: stdoutLogger(),
+	}
+
+	err = oh.Handle(context.TODO(), "test", &runtime.RawExtension{
+		Raw: dat,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIssueDiego(t *testing.T) {
+	dat, err := loadSample("obj-sample.2.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rc, err := newRestConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app, err := dynamic.NewApplier(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env := cache.New[string, string]()
+
+	oh := &objStepHandler{
+		app: app,
+		env: env,
+		ns:  "krateo-system",
+		op:  Create,
+		subst: func(k string) string {
+			return k
+		},
 		logr: stdoutLogger(),
 	}
 
