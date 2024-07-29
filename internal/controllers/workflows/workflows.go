@@ -101,7 +101,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 	}
 
 	got := ptr.Deref(cr.Status.Digest, "")
-	if len(got) == 0 {
+	if len(got) == 0 && meta.WasDeleted(cr) {
 		return reconciler.ExternalObservation{
 			ResourceExists:   false,
 			ResourceUpToDate: true,
@@ -201,10 +201,6 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return nil
 	}
 
-	if meta.WasDeleted(cr) {
-		return nil
-	}
-
 	e.wf.Op(steps.Delete)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		return s.Type == workflowsv1alpha1.TypeVar
@@ -213,7 +209,10 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 	err := workflows.Err(results)
 	if err != nil {
 		e.log.Debug("Worflow failure", "op", "delete", "error", err.Error())
+		return err
 	}
 
-	return err
+	cr.Status.Digest = ptr.To("")
+
+	return e.kube.Status().Update(ctx, cr)
 }
