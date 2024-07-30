@@ -3,6 +3,7 @@ package workflows
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
@@ -98,6 +99,10 @@ func (wf *Workflow) Op(op steps.Op) {
 
 func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec, skip func(*v1alpha1.Step) bool) (results []StepResult) {
 	results = make([]StepResult, len(spec.Steps))
+
+	if wf.op == steps.Delete {
+		slices.Reverse(spec.Steps)
+	}
 
 	for i, x := range spec.Steps {
 		if skip(x) {
