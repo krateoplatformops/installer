@@ -101,7 +101,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 	}
 
 	got := ptr.Deref(cr.Status.Digest, "")
-	if len(got) == 0 && meta.WasDeleted(cr) {
+	if len(got) == 0 && meta.WasDeleted(cr) && cr.Status.GetCondition(rtv1.TypeReady).Reason == rtv1.ReasonDeleting {
 		return reconciler.ExternalObservation{
 			ResourceExists:   false,
 			ResourceUpToDate: true,
@@ -212,6 +212,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
+	cr.Status.SetConditions(rtv1.Deleting())
 	cr.Status.Digest = ptr.To("")
 
 	return e.kube.Status().Update(ctx, cr)
