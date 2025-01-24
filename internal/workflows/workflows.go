@@ -132,7 +132,7 @@ func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec, skip f
 			results[i].err = err
 			return
 		}
-		if wf.maxHistory != nil {
+		if res.MaxHistory == nil && wf.maxHistory != nil {
 			res.MaxHistory = wf.maxHistory
 		}
 
