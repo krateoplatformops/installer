@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -13,7 +14,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func New(rc *rest.Config, ns string, logr logging.Logger) (*Workflow, error) {
+func New(rc *rest.Config, ns string, logr logging.Logger, maxHelmHistory int) (*Workflow, error) {
 	dyn, err := dynamic.NewGetter(rc)
 	if err != nil {
 		return nil, err
@@ -54,6 +55,7 @@ func New(rc *rest.Config, ns string, logr logging.Logger) (*Workflow, error) {
 				Dyn:        dyn,
 			}),
 		},
+		maxHistory: &maxHelmHistory,
 	}, nil
 }
 
@@ -86,11 +88,12 @@ func Err(results []StepResult) error {
 }
 
 type Workflow struct {
-	logr logging.Logger
-	ns   string
-	env  *cache.Cache[string, string]
-	reg  map[v1alpha1.StepType]steps.Handler
-	op   steps.Op
+	logr       logging.Logger
+	ns         string
+	env        *cache.Cache[string, string]
+	reg        map[v1alpha1.StepType]steps.Handler
+	op         steps.Op
+	maxHistory *int
 }
 
 func (wf *Workflow) Op(op steps.Op) {
@@ -123,7 +126,23 @@ func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec, skip f
 		job.Namespace(wf.ns)
 		job.Op(wf.op)
 
-		err := job.Handle(ctx, x.ID, x.With)
+		res := v1alpha1.ChartSpec{}
+		err := json.Unmarshal(x.With.Raw, &res)
+		if err != nil {
+			results[i].err = err
+			return
+		}
+		if res.MaxHistory == nil && wf.maxHistory != nil {
+			res.MaxHistory = wf.maxHistory
+		}
+
+		x.With.Raw, err = json.Marshal(res)
+		if err != nil {
+			results[i].err = err
+			return
+		}
+
+		err = job.Handle(ctx, x.ID, x.With)
 		if err != nil {
 			results[i].err = err
 			return

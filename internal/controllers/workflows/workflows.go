@@ -21,14 +21,22 @@ import (
 	"github.com/krateoplatformops/provider-runtime/pkg/ratelimiter"
 	"github.com/krateoplatformops/provider-runtime/pkg/reconciler"
 	"github.com/krateoplatformops/provider-runtime/pkg/resource"
+	"github.com/krateoplatformops/snowplow/plumbing/env"
 	"github.com/pkg/errors"
 )
 
 const (
-	errNotCR = "managed resource is not a KrateoPlatformOps custom resource"
-
+	errNotCR            = "managed resource is not a KrateoPlatformOps custom resource"
 	creationGracePeriod = 2 * time.Minute
 	reconcileTimeout    = 10 * time.Minute
+)
+
+const (
+	MAX_HELM_HISTORY_VAR = "MAX_HELM_HISTORY"
+)
+
+var (
+	MAX_HELM_HISTORY int // the maximum number of helm releases to keep in history
 )
 
 func Setup(mgr ctrl.Manager, o controller.Options) error {
@@ -49,13 +57,16 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		reconciler.WithCreationGracePeriod(creationGracePeriod),
 		reconciler.WithPollInterval(o.PollInterval),
 		reconciler.WithLogger(log),
-		reconciler.WithRecorder(event.NewAPIRecorder(recorder)))
+		reconciler.WithRecorder(event.NewAPIRecorder(recorder)),
+	)
+
+	MAX_HELM_HISTORY = env.Int(MAX_HELM_HISTORY_VAR, 10)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		For(&workflowsv1alpha1.KrateoPlatformOps{}).
-		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
+		Complete(ratelimiter.New(name, r, o.GlobalRateLimiter))
 }
 
 type connector struct {
@@ -74,6 +85,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (reconcile
 	wf, err := workflows.New(c.rc,
 		cr.GetNamespace(),
 		c.log.WithValues("workflow", cr.GetName()),
+		MAX_HELM_HISTORY,
 	)
 	if err != nil {
 		return nil, err
@@ -85,6 +97,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (reconcile
 		wf:   wf,
 		rec:  c.recorder,
 	}, nil
+
 }
 
 type external struct {
@@ -101,7 +114,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 	}
 
 	got := ptr.Deref(cr.Status.Digest, "")
-	if len(got) == 0 && meta.WasDeleted(cr) && cr.Status.GetCondition(rtv1.TypeReady).Reason == rtv1.ReasonDeleting {
+	if len(got) == 0 && meta.WasDeleted(cr) && cr.GetCondition(rtv1.TypeReady).Reason == rtv1.ReasonDeleting {
 		return reconciler.ExternalObservation{
 			ResourceExists:   false,
 			ResourceUpToDate: true,
@@ -154,7 +167,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
-	cr.Status.SetConditions(rtv1.Available())
+	cr.SetConditions(rtv1.Available())
 	cr.Status.Digest = ptr.To(digestForSteps(cr))
 
 	return e.kube.Status().Update(ctx, cr)
@@ -184,7 +197,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
-	cr.Status.SetConditions(rtv1.Available())
+	cr.SetConditions(rtv1.Available())
 	cr.Status.Digest = ptr.To(digestForSteps(cr))
 
 	return e.kube.Status().Update(ctx, cr)
@@ -195,6 +208,8 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotCR)
 	}
+
+	e.log.Debug("Deleting external resource")
 
 	if !meta.IsActionAllowed(cr, meta.ActionDelete) {
 		e.log.Debug("External resource should not be deleted by provider, skip deleting.")
@@ -212,7 +227,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
-	cr.Status.SetConditions(rtv1.Deleting())
+	cr.SetConditions(rtv1.Deleting())
 	cr.Status.Digest = ptr.To("")
 
 	return e.kube.Status().Update(ctx, cr)

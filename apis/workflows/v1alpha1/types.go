@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
-	prv1 "github.com/krateoplatformops/provider-runtime/apis/common/v1"
+	rtv1 "github.com/krateoplatformops/provider-runtime/apis/common/v1"
 	"github.com/twmb/murmur3"
 )
 
@@ -20,7 +20,7 @@ type Data struct {
 type ObjectMeta struct {
 	APIVersion string         `json:"apiVersion"`
 	Kind       string         `json:"kind"`
-	Metadata   prv1.Reference `json:"metadata"`
+	Metadata   rtv1.Reference `json:"metadata"`
 }
 
 type ValueFromSource struct {
@@ -35,7 +35,7 @@ type Var struct {
 
 type Credentials struct {
 	Username    string                 `json:"username"`
-	PasswordRef prv1.SecretKeySelector `json:"passwordRef"`
+	PasswordRef rtv1.SecretKeySelector `json:"passwordRef"`
 }
 
 type ChartSpec struct {
@@ -49,6 +49,9 @@ type ChartSpec struct {
 	URL string `json:"url,omitempty"`
 	// // PullSecretRef is reference to the secret containing credentials to helm repository
 	// PullSecretRef prv1.SecretKeySelector `json:"pullSecretRef,omitempty"`
+
+	// MaxHistory is the maximum number of helm releases to keep in history
+	MaxHistory *int `json:"maxHistory,omitempty"`
 
 	// Namespace to install the release into.
 	//Namespace string `json:"namespace"`
@@ -112,13 +115,12 @@ func (s *Step) Digest() string {
 }
 
 type WorkflowSpec struct {
-	prv1.ManagedSpec `json:",inline"`
-	Steps            []*Step `json:"steps,omitempty"`
+	Steps []*Step `json:"steps,omitempty"`
 }
 
 type WorkflowStatus struct {
-	prv1.ManagedStatus `json:",inline"`
-	Digest             *string `json:"digest,omitempty"`
+	rtv1.ConditionedStatus `json:",inline"`
+	Digest                 *string `json:"digest,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -143,4 +145,12 @@ type KrateoPlatformOpsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []KrateoPlatformOps `json:"items"`
+}
+
+func (mg *KrateoPlatformOps) GetCondition(ct rtv1.ConditionType) rtv1.Condition {
+	return mg.Status.GetCondition(ct)
+}
+
+func (mg *KrateoPlatformOps) SetConditions(c ...rtv1.Condition) {
+	mg.Status.SetConditions(c...)
 }
