@@ -49,13 +49,14 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		reconciler.WithCreationGracePeriod(creationGracePeriod),
 		reconciler.WithPollInterval(o.PollInterval),
 		reconciler.WithLogger(log),
-		reconciler.WithRecorder(event.NewAPIRecorder(recorder)))
+		reconciler.WithRecorder(event.NewAPIRecorder(recorder)),
+	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		For(&workflowsv1alpha1.KrateoPlatformOps{}).
-		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
+		Complete(ratelimiter.New(name, r, o.GlobalRateLimiter))
 }
 
 type connector struct {
@@ -85,6 +86,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (reconcile
 		wf:   wf,
 		rec:  c.recorder,
 	}, nil
+
 }
 
 type external struct {
@@ -101,7 +103,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 	}
 
 	got := ptr.Deref(cr.Status.Digest, "")
-	if len(got) == 0 && meta.WasDeleted(cr) && cr.Status.GetCondition(rtv1.TypeReady).Reason == rtv1.ReasonDeleting {
+	if len(got) == 0 && meta.WasDeleted(cr) && cr.GetCondition(rtv1.TypeReady).Reason == rtv1.ReasonDeleting {
 		return reconciler.ExternalObservation{
 			ResourceExists:   false,
 			ResourceUpToDate: true,
@@ -154,7 +156,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
-	cr.Status.SetConditions(rtv1.Available())
+	cr.SetConditions(rtv1.Available())
 	cr.Status.Digest = ptr.To(digestForSteps(cr))
 
 	return e.kube.Status().Update(ctx, cr)
@@ -184,7 +186,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
-	cr.Status.SetConditions(rtv1.Available())
+	cr.SetConditions(rtv1.Available())
 	cr.Status.Digest = ptr.To(digestForSteps(cr))
 
 	return e.kube.Status().Update(ctx, cr)
@@ -195,6 +197,8 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotCR)
 	}
+
+	e.log.Debug("Deleting external resource")
 
 	if !meta.IsActionAllowed(cr, meta.ActionDelete) {
 		e.log.Debug("External resource should not be deleted by provider, skip deleting.")
@@ -212,7 +216,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
-	cr.Status.SetConditions(rtv1.Deleting())
+	cr.SetConditions(rtv1.Deleting())
 	cr.Status.Digest = ptr.To("")
 
 	return e.kube.Status().Update(ctx, cr)

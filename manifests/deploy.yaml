@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: installer-dev
+  labels:
+    app.kubernetes.io/name: installer-dev
+    app: installer-dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: installer-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: installer-dev
+        app: installer-dev
+    spec:
+      serviceAccountName: installer-dev
+      containers:
+      - name: installer-dev-container
+        image: kind.local/installer:latest
+        imagePullPolicy: Never
+        args:
+          - --debug
+        ports:
+        - containerPort: 8080

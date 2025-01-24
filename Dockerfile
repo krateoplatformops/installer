@@ -1,5 +1,5 @@
 # Build phase
-FROM golang:1.21.6-bullseye as builder
+FROM golang:1.23-bullseye as builder
 LABEL stage=builder
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -18,7 +18,7 @@ COPY go.sum go.sum
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
 
-COPY cmd/ cmd/
+COPY main.go main.go
 COPY apis/ apis/
 COPY internal/ internal/
 
@@ -29,7 +29,7 @@ RUN CGO_ENABLED=0 GO111MODULE=on go build -a -o /bin/manager cmd/main.go && \
 
 # Deployment environment
 # ----------------------
-FROM golang:1.21.6-alpine3.18
+FROM golang:1.23-alpine3.21
 
 ENV GOCACHE='/tmp/.cache'
 RUN mkdir -p "$GOCACHE/go-build" && chmod -R 1777 "$GOCACHE"
