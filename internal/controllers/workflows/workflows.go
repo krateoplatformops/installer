@@ -21,14 +21,22 @@ import (
 	"github.com/krateoplatformops/provider-runtime/pkg/ratelimiter"
 	"github.com/krateoplatformops/provider-runtime/pkg/reconciler"
 	"github.com/krateoplatformops/provider-runtime/pkg/resource"
+	"github.com/krateoplatformops/snowplow/plumbing/env"
 	"github.com/pkg/errors"
 )
 
 const (
-	errNotCR = "managed resource is not a KrateoPlatformOps custom resource"
-
+	errNotCR            = "managed resource is not a KrateoPlatformOps custom resource"
 	creationGracePeriod = 2 * time.Minute
 	reconcileTimeout    = 10 * time.Minute
+)
+
+const (
+	MAX_HELM_HISTORY_VAR = "MAX_HELM_HISTORY"
+)
+
+var (
+	MAX_HELM_HISTORY int // the maximum number of helm releases to keep in history
 )
 
 func Setup(mgr ctrl.Manager, o controller.Options) error {
@@ -51,6 +59,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		reconciler.WithLogger(log),
 		reconciler.WithRecorder(event.NewAPIRecorder(recorder)),
 	)
+
+	MAX_HELM_HISTORY = env.Int(MAX_HELM_HISTORY_VAR, 10)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
@@ -75,6 +85,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (reconcile
 	wf, err := workflows.New(c.rc,
 		cr.GetNamespace(),
 		c.log.WithValues("workflow", cr.GetName()),
+		MAX_HELM_HISTORY,
 	)
 	if err != nil {
 		return nil, err

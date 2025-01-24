@@ -119,6 +119,7 @@ func (r *chartStepHandler) toChartSpec(ctx context.Context, id string, ext *runt
 		Version:         res.Version,
 		CreateNamespace: true,
 		UpgradeCRDs:     true,
+		MaxHistory:      ptr.Deref(res.MaxHistory, 10),
 		Wait:            ptr.Deref(res.Wait, true),
 		ValuesOptions:   r.valuesOptions(id, res.Set),
 		Timeout:         timeout,
