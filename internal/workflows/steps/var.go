@@ -60,10 +60,14 @@ func (r *varStepHandler) Handle(ctx context.Context, id string, ext *runtime.Raw
 
 		r.logr.Debug(fmt.Sprintf(
 			"DBG: step (id: %s), type: var (name: %s, value: %s)",
-			id, res.Name, ellipsis(val, 20)))
+			id, res.Name, val))
+	} else {
+		r.logr.Debug(fmt.Sprintf(
+			"DBG: step (id: %s), type: var (name: %s) with.Value is empty", id, res.Name))
 	}
 
 	if res.ValueFrom == nil {
+		r.logr.Debug(fmt.Sprintf("DBG: step (id: %s), type: var (name: %s), with.valueFrom is empty", id, res.Name))
 		return nil
 	}
 
@@ -94,7 +98,7 @@ func (r *varStepHandler) Handle(ctx context.Context, id string, ext *runtime.Raw
 
 		r.logr.Debug(fmt.Sprintf(
 			"DBG [var:%s]: var (name: %s, value: %s)",
-			id, res.Name, ellipsis(strval(val), 30)))
+			id, res.Name, strval(val)))
 	}
 
 	return err
