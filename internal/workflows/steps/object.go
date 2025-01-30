@@ -108,6 +108,8 @@ func (r *objStepHandler) toUnstructured(id string, ext *runtime.RawExtension) (*
 		return nil, err
 	}
 
+	r.logr.Debug(fmt.Sprintf("DBG [object:%s]: %v", id, src))
+
 	return &unstructured.Unstructured{Object: src}, nil
 }
 
@@ -131,8 +133,17 @@ func (r *objStepHandler) resolveVars(id string, res []*v1alpha1.Data, src map[st
 			if r.op != Delete {
 				r.logr.Debug(fmt.Sprintf(
 					"DBG [object:%s]: prop (name: %s, value: %s)",
-					id, el.Name, ellipsis(val, 20)))
+					id, el.Name, val))
+			} else {
+				r.logr.Debug(fmt.Sprintf(
+					"DBG [object:%s]: prop (name: %s, value: %s), delete",
+					id, el.Name, val),
+				)
 			}
+		} else {
+			r.logr.Debug(fmt.Sprintf(
+				"DBG [object:%s]: prop (name: %s, value: %s)",
+				id, el.Name, "no value"))
 		}
 	}
 

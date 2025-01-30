@@ -126,23 +126,24 @@ func (wf *Workflow) Run(ctx context.Context, spec *v1alpha1.WorkflowSpec, skip f
 		job.Namespace(wf.ns)
 		job.Op(wf.op)
 
-		res := v1alpha1.ChartSpec{}
-		err := json.Unmarshal(x.With.Raw, &res)
-		if err != nil {
-			results[i].err = err
-			return
-		}
-		if res.MaxHistory == nil && wf.maxHistory != nil {
-			res.MaxHistory = wf.maxHistory
+		if x.Type == v1alpha1.TypeChart {
+			res := v1alpha1.ChartSpec{}
+			err := json.Unmarshal(x.With.Raw, &res)
+			if err != nil {
+				results[i].err = err
+				return
+			}
+			if res.MaxHistory == nil && wf.maxHistory != nil {
+				res.MaxHistory = wf.maxHistory
+			}
+			x.With.Raw, err = json.Marshal(res)
+			if err != nil {
+				results[i].err = err
+				return
+			}
 		}
 
-		x.With.Raw, err = json.Marshal(res)
-		if err != nil {
-			results[i].err = err
-			return
-		}
-
-		err = job.Handle(ctx, x.ID, x.With)
+		err := job.Handle(ctx, x.ID, x.With)
 		if err != nil {
 			results[i].err = err
 			return
