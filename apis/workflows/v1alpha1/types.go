@@ -50,6 +50,10 @@ type ChartSpec struct {
 	// // PullSecretRef is reference to the secret containing credentials to helm repository
 	// PullSecretRef prv1.SecretKeySelector `json:"pullSecretRef,omitempty"`
 
+	// ReleaseName is the name of the release. If not set, Name will be used.
+	// +optional
+	ReleaseName string `json:"releaseName,omitempty"`
+
 	// MaxHistory is the maximum number of helm releases to keep in history
 	MaxHistory *int `json:"maxHistory,omitempty"`
 
