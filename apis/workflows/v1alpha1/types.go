@@ -50,7 +50,7 @@ type ChartSpec struct {
 	// // PullSecretRef is reference to the secret containing credentials to helm repository
 	// PullSecretRef prv1.SecretKeySelector `json:"pullSecretRef,omitempty"`
 
-	// ReleaseName is the name of the release. If not set, Name will be used.
+	// ReleaseName is the name of the release. If not set, Name will be used or it will be deriverd from the URL
 	// +optional
 	ReleaseName string `json:"releaseName,omitempty"`
 
