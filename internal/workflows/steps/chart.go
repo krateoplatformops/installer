@@ -125,6 +125,9 @@ func (r *chartStepHandler) toChartSpec(ctx context.Context, id string, ext *runt
 		Timeout:         timeout,
 		Repository:      res.Name,
 	}
+	if res.ReleaseName != "" {
+		spec.ReleaseName = res.ReleaseName
+	}
 	if res.InsecureSkipTLSVerify != nil {
 		spec.InsecureSkipTLSverify = *res.InsecureSkipTLSVerify
 	}
