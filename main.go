@@ -79,6 +79,8 @@ func main() {
 
 	log.Debug("Starting", "sync-period", syncPeriod.String(), "poll-interval", pollInterval.String(), "max-error-retry-interval", maxErrorRetryInterval.String())
 
+	ctrl.SetLogger(logrlog)
+
 	cfg, err := ctrl.GetConfig()
 	if err != nil {
 		log.Info("Cannot get API server rest config", "error", err.Error())
