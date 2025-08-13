@@ -14,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/e2e-framework/klient/decoder"
 	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
@@ -461,53 +460,6 @@ func TestWorkflowChartOperations(t *testing.T) {
 
 	testenv.Test(t, feature)
 }
-
-// func TestWorkflowCompleteScenario(t *testing.T) {
-// 	feature := features.New("Complete Workflow Scenario").
-// 		Setup(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-// 			return ctx
-// 		}).
-// 		Assess("Multi-step workflow", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-// 			workflow, err := createTestWorkflow(cfg)
-// 			if err != nil {
-// 				t.Fatalf("Failed to create test workflow: %v", err)
-// 			}
-
-// 			// Load a complete workflow spec from testdata
-// 			spec, err := loadWorkflowSpec("krateo.yaml")
-// 			if err != nil {
-// 				t.Logf("Could not load krateo.yaml, using minimal spec: %v", err)
-// 				// Use a minimal test spec instead
-// 				spec = createMinimalWorkflowSpec()
-// 			}
-
-// 			workflow.Op(steps.Create)
-// 			results := workflow.Run(ctx, spec, func(s *v1alpha1.Step) bool {
-// 				// Skip chart installations in test environment
-// 				return s.Type == v1alpha1.TypeChart
-// 			})
-
-// 			if err := Err(results); err != nil {
-// 				t.Fatalf("Workflow execution failed: %v", err)
-// 			}
-
-// 			// Print environment variables for debugging
-// 			t.Log("Environment variables after workflow execution:")
-// 			workflow.env.ForEach(func(k, v string) bool {
-// 				t.Logf("  %s = %s", k, v)
-// 				return true
-// 			})
-
-// 			t.Logf("Workflow completed successfully with %d steps", len(results))
-// 			return ctx
-// 		}).
-// 		Feature()
-
-// 	testenv.Test(t, feature)
-// }
-
-// Helper functions
-
 func createTestWorkflow(cfg *envconf.Config) (*Workflow, error) {
 	getter, err := getter.NewGetter(cfg.Client().RESTConfig())
 	if err != nil {
@@ -556,35 +508,4 @@ func createTestWorkflow(cfg *envconf.Config) (*Workflow, error) {
 		MaxHelmHistory: 10,
 		Namespace:      namespace,
 	})
-}
-
-func decodeYAML(data []byte) (*v1alpha1.KrateoPlatformOps, error) {
-	s := runtime.NewScheme()
-	s.AddKnownTypes(v1alpha1.SchemeGroupVersion,
-		&v1alpha1.KrateoPlatformOps{},
-		&v1alpha1.KrateoPlatformOpsList{},
-	)
-
-	serializer := jsonserializer.NewSerializerWithOptions(
-		jsonserializer.DefaultMetaFactory,
-		s,
-		s,
-		jsonserializer.SerializerOptions{
-			Yaml:   true,
-			Pretty: false,
-			Strict: false,
-		},
-	)
-
-	obj, _, err := serializer.Decode(data, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	cr, ok := obj.(*v1alpha1.KrateoPlatformOps)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type %T", obj)
-	}
-
-	return cr, nil
 }

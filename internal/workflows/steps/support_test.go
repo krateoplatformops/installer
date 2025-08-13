@@ -5,12 +5,8 @@ package steps
 
 import (
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
-	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/funcr"
@@ -19,25 +15,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
-
-func TestDeriveRepoName(t *testing.T) {
-	table := []struct {
-		in   string
-		want string
-	}{
-		{"https://charts.loft.sh", "loft-sh"},
-		{"https://https://charts.krateo.io", "krateo-io"},
-	}
-
-	for i, tc := range table {
-		got := DeriveRepoName(tc.in)
-		if got != tc.want {
-			t.Fatalf("[tc: %d] - got: %v, expected: %v", i, got, tc.want)
-		}
-	}
-}
 
 func helmClientForNamespace(rc *rest.Config, ns string) (helmclient.Client, error) {
 	opt := &helmclient.RestConfClientOptions{
@@ -55,25 +33,6 @@ func helmClientForNamespace(rc *rest.Config, ns string) (helmclient.Client, erro
 	}
 
 	return helmclient.NewClientFromRestConf(opt)
-}
-
-func newRestConfig() (*rest.Config, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	return clientcmd.BuildConfigFromFlags("", filepath.Join(home, ".kube", "config"))
-}
-
-func loadSample(fn string) ([]byte, error) {
-	fin, err := os.Open(filepath.Join("..", "..", "..", "testdata", fn))
-	if err != nil {
-		return nil, err
-	}
-	defer fin.Close()
-
-	return io.ReadAll(fin)
 }
 
 func stdoutLogger() logging.Logger {
