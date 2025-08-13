@@ -7,9 +7,11 @@ import (
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
-	"github.com/krateoplatformops/installer/internal/dynamic"
+	"github.com/krateoplatformops/installer/internal/dynamic/applier"
+	"github.com/krateoplatformops/installer/internal/dynamic/deletor"
 	"github.com/krateoplatformops/installer/internal/expand"
-	"github.com/krateoplatformops/installer/internal/ptr"
+	"github.com/krateoplatformops/installer/internal/workflows/steps"
+	"github.com/krateoplatformops/plumbing/ptr"
 	"github.com/krateoplatformops/provider-runtime/pkg/logging"
 	"helm.sh/helm/v3/pkg/strvals"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -18,9 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var _ Handler = (*objStepHandler)(nil)
+var _ steps.Handler[*steps.ObjectResult] = (*objStepHandler)(nil)
 
-func ObjectHandler(app *dynamic.Applier, del *dynamic.Deletor, env *cache.Cache[string, string], logr logging.Logger) Handler {
+func ObjectHandler(app *applier.Applier, del *deletor.Deletor, env *cache.Cache[string, string], logr logging.Logger) steps.Handler[*steps.ObjectResult] {
 	return &objStepHandler{
 		app: app, del: del, env: env,
 		subst: func(k string) string {
@@ -35,11 +37,11 @@ func ObjectHandler(app *dynamic.Applier, del *dynamic.Deletor, env *cache.Cache[
 }
 
 type objStepHandler struct {
-	app   *dynamic.Applier
-	del   *dynamic.Deletor
+	app   *applier.Applier
+	del   *deletor.Deletor
 	env   *cache.Cache[string, string]
 	ns    string
-	op    Op
+	op    steps.Op
 	subst func(k string) string
 	logr  logging.Logger
 }
@@ -48,23 +50,31 @@ func (r *objStepHandler) Namespace(ns string) {
 	r.ns = ns
 }
 
-func (r *objStepHandler) Op(op Op) {
+func (r *objStepHandler) Op(op steps.Op) {
 	r.op = op
 }
 
-func (r *objStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) error {
+func (r *objStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) (*steps.ObjectResult, error) {
 	uns, err := r.toUnstructured(id, ext)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	gv, err := schema.ParseGroupVersion(uns.GetAPIVersion())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if r.op == Delete {
-		err := r.del.Delete(ctx, dynamic.DeleteOptions{
+	result := &steps.ObjectResult{
+		APIVersion: uns.GetAPIVersion(),
+		Kind:       uns.GetKind(),
+		Name:       uns.GetName(),
+		Namespace:  uns.GetNamespace(),
+	}
+
+	if r.op == steps.Delete {
+		result.Operation = "delete"
+		err := r.del.Delete(ctx, deletor.DeleteOptions{
 			GVK:       gv.WithKind(uns.GetKind()),
 			Namespace: uns.GetNamespace(),
 			Name:      uns.GetName(),
@@ -72,14 +82,17 @@ func (r *objStepHandler) Handle(ctx context.Context, id string, ext *runtime.Raw
 		if apierrors.IsNotFound(err) {
 			err = nil
 		}
-		return err
+		return result, err
 	}
 
-	return r.app.Apply(ctx, uns.Object, dynamic.ApplyOptions{
+	result.Operation = "apply"
+	err = r.app.Apply(ctx, uns.Object, applier.ApplyOptions{
 		GVK:       gv.WithKind(uns.GetKind()),
 		Namespace: uns.GetNamespace(),
 		Name:      uns.GetName(),
 	})
+
+	return result, err
 }
 
 func (r *objStepHandler) toUnstructured(id string, ext *runtime.RawExtension) (*unstructured.Unstructured, error) {
@@ -130,7 +143,7 @@ func (r *objStepHandler) resolveVars(id string, res []*v1alpha1.Data, src map[st
 				}
 			}
 
-			if r.op != Delete {
+			if r.op != steps.Delete {
 				r.logr.Debug(fmt.Sprintf(
 					"DBG [object:%s]: prop (name: %s, value: %s)",
 					id, el.Name, val))

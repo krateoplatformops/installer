@@ -1,26 +1,26 @@
-package dynamic
+package deletor
 
 import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	corev1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/utils/ptr"
 )
 
-type GetOptions struct {
+type DeleteOptions struct {
 	GVK       schema.GroupVersionKind
 	Namespace string
 	Name      string
 }
 
-func NewGetter(rc *rest.Config) (*Getter, error) {
+func NewDeletor(rc *rest.Config) (*Deletor, error) {
 	dynamicClient, err := dynamic.NewForConfig(rc)
 	if err != nil {
 		return nil, err
@@ -35,21 +35,21 @@ func NewGetter(rc *rest.Config) (*Getter, error) {
 		cacheddiscovery.NewMemCacheClient(discoveryClient),
 	)
 
-	return &Getter{
+	return &Deletor{
 		dynamicClient: dynamicClient,
 		mapper:        mapper,
 	}, nil
 }
 
-type Getter struct {
+type Deletor struct {
 	dynamicClient *dynamic.DynamicClient
 	mapper        *restmapper.DeferredDiscoveryRESTMapper
 }
 
-func (g *Getter) Get(ctx context.Context, opts GetOptions) (*unstructured.Unstructured, error) {
+func (g *Deletor) Delete(ctx context.Context, opts DeleteOptions) error {
 	restMapping, err := g.mapper.RESTMapping(opts.GVK.GroupKind(), opts.GVK.Version)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var ri dynamic.ResourceInterface
@@ -60,5 +60,7 @@ func (g *Getter) Get(ctx context.Context, opts GetOptions) (*unstructured.Unstru
 			Namespace(opts.Namespace)
 	}
 
-	return ri.Get(ctx, opts.Name, corev1.GetOptions{})
+	return ri.Delete(ctx, opts.Name, metav1.DeleteOptions{
+		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
+	})
 }

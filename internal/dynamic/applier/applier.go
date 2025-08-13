@@ -1,4 +1,4 @@
-package dynamic
+package applier
 
 import (
 	"context"
