@@ -9,24 +9,26 @@ import (
 
 	"github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
 	"github.com/krateoplatformops/installer/internal/cache"
-	"github.com/krateoplatformops/installer/internal/dynamic"
+	"github.com/krateoplatformops/installer/internal/dynamic/getter"
 	"github.com/krateoplatformops/installer/internal/expand"
 	"github.com/krateoplatformops/installer/internal/helmclient"
 	"github.com/krateoplatformops/installer/internal/helmclient/values"
-	"github.com/krateoplatformops/installer/internal/ptr"
 	"github.com/krateoplatformops/installer/internal/resolvers"
+	"github.com/krateoplatformops/installer/internal/workflows/steps"
+	"github.com/krateoplatformops/plumbing/ptr"
 	"github.com/krateoplatformops/provider-runtime/pkg/logging"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type ChartHandlerOptions struct {
-	Dyn        *dynamic.Getter
+	Dyn        *getter.Getter
 	HelmClient helmclient.Client
 	Env        *cache.Cache[string, string]
 	Log        logging.Logger
 }
 
-func ChartHandler(opts ChartHandlerOptions) Handler {
+func ChartHandler(opts ChartHandlerOptions) steps.Handler[*steps.ChartResult] {
 	hdl := &chartStepHandler{
 		cli:  opts.HelmClient,
 		env:  opts.Env,
@@ -44,48 +46,80 @@ func ChartHandler(opts ChartHandlerOptions) Handler {
 	return hdl
 }
 
-var _ Handler = (*chartStepHandler)(nil)
+var _ steps.Handler[*steps.ChartResult] = (*chartStepHandler)(nil)
 
 type chartStepHandler struct {
 	cli    helmclient.Client
 	env    *cache.Cache[string, string]
 	ns     string
-	op     Op
+	op     steps.Op
 	subst  func(k string) string
 	render bool
 	logr   logging.Logger
-	dyn    *dynamic.Getter
+	dyn    *getter.Getter
 }
 
 func (r *chartStepHandler) Namespace(ns string) {
 	r.ns = ns
 }
 
-func (r *chartStepHandler) Op(op Op) {
+func (r *chartStepHandler) Op(op steps.Op) {
 	r.op = op
 }
 
-func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) error {
+func (r *chartStepHandler) Handle(ctx context.Context, id string, ext *runtime.RawExtension) (*steps.ChartResult, error) {
 	spec, err := r.toChartSpec(ctx, id, ext)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if r.op != Delete {
-		_, err = r.cli.InstallOrUpgradeChart(ctx, spec, nil)
-		return err
+	result := &steps.ChartResult{}
+
+	if r.op != steps.Delete {
+		result.Operation = "install/upgrade"
+
+		release, err := r.cli.InstallOrUpgradeChart(ctx, spec, nil)
+		if err != nil {
+			return result, err
+		}
+
+		if release != nil {
+			result.Status = string(release.Info.Status)
+			result.ChartVersion = release.Chart.Metadata.Version
+			result.AppVersion = release.Chart.Metadata.AppVersion
+			result.ReleaseName = release.Name
+			result.ChartName = release.Chart.Metadata.Name
+			result.Namespace = release.Namespace
+			result.Updated = metav1.NewTime(release.Info.LastDeployed.Time)
+			result.Revision = release.Version
+		}
+
+		r.logr.Debug(fmt.Sprintf(
+			"[chart:%s]: %s operation completed for release %s",
+			id, result.Operation, result.ReleaseName))
+
+		return result, nil
 	}
+
+	result.Operation = "uninstall"
 
 	err = r.cli.UninstallRelease(spec)
 	if err != nil {
 		r.logr.Info(fmt.Sprintf("WARN: %s (%s)", err.Error(), spec.ChartName))
 		if strings.Contains(err.Error(), "release: not found") {
-			return nil
+			result.Status = "not_found"
+			return result, nil
 		}
-		return err
+		return result, err
 	}
 
-	return nil
+	result.Status = "uninstalled"
+
+	r.logr.Debug(fmt.Sprintf(
+		"[chart:%s]: uninstall operation completed for release %s",
+		id, result.ReleaseName))
+
+	return result, nil
 }
 
 func (r *chartStepHandler) toChartSpec(ctx context.Context, id string, ext *runtime.RawExtension) (*helmclient.ChartSpec, error) {
@@ -130,7 +164,7 @@ func (r *chartStepHandler) toChartSpec(ctx context.Context, id string, ext *runt
 	}
 	if res.URL != "" {
 		spec.ChartName = res.URL
-		spec.ReleaseName = deriveReleaseName(res.URL)
+		spec.ReleaseName = steps.DeriveReleaseName(res.URL)
 	}
 	if res.ReleaseName != "" {
 		spec.ReleaseName = res.ReleaseName
@@ -164,7 +198,7 @@ func (r *chartStepHandler) valuesOptions(id string, res []*v1alpha1.Data) (opts 
 
 			r.logr.Debug(fmt.Sprintf(
 				"[chart:%s]: set (name: %s, value: %s)",
-				id, el.Name, strval(val)))
+				id, el.Name, steps.Strval(val)))
 		}
 	}
 

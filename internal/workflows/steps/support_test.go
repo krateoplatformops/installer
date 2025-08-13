@@ -32,7 +32,7 @@ func TestDeriveRepoName(t *testing.T) {
 	}
 
 	for i, tc := range table {
-		got := deriveRepoName(tc.in)
+		got := DeriveRepoName(tc.in)
 		if got != tc.want {
 			t.Fatalf("[tc: %d] - got: %v, expected: %v", i, got, tc.want)
 		}

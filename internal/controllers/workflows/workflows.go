@@ -10,9 +10,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workflowsv1alpha1 "github.com/krateoplatformops/installer/apis/workflows/v1alpha1"
-	"github.com/krateoplatformops/installer/internal/ptr"
+	"github.com/krateoplatformops/installer/internal/dynamic/applier"
+	"github.com/krateoplatformops/installer/internal/dynamic/deletor"
+	"github.com/krateoplatformops/installer/internal/dynamic/getter"
+
 	"github.com/krateoplatformops/installer/internal/workflows"
 	"github.com/krateoplatformops/installer/internal/workflows/steps"
+	"github.com/krateoplatformops/plumbing/env"
 	rtv1 "github.com/krateoplatformops/provider-runtime/apis/common/v1"
 	"github.com/krateoplatformops/provider-runtime/pkg/controller"
 	"github.com/krateoplatformops/provider-runtime/pkg/event"
@@ -21,7 +25,6 @@ import (
 	"github.com/krateoplatformops/provider-runtime/pkg/ratelimiter"
 	"github.com/krateoplatformops/provider-runtime/pkg/reconciler"
 	"github.com/krateoplatformops/provider-runtime/pkg/resource"
-	"github.com/krateoplatformops/snowplow/plumbing/env"
 	"github.com/pkg/errors"
 )
 
@@ -45,6 +48,9 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 	recorder := mgr.GetEventRecorderFor(name)
 
+	timeout := env.Duration("INSTALLER_PROVIDER_TIMEOUT", reconcileTimeout)
+	MAX_HELM_HISTORY = env.Int(MAX_HELM_HISTORY_VAR, 10)
+
 	r := reconciler.NewReconciler(mgr,
 		resource.ManagedKind(workflowsv1alpha1.KrateoPlatformOpsGroupVersionKind),
 		reconciler.WithExternalConnecter(&connector{
@@ -53,14 +59,12 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 			rc:       mgr.GetConfig(),
 			recorder: recorder,
 		}),
-		reconciler.WithTimeout(reconcileTimeout),
+		reconciler.WithTimeout(timeout),
 		reconciler.WithCreationGracePeriod(creationGracePeriod),
 		reconciler.WithPollInterval(o.PollInterval),
 		reconciler.WithLogger(log),
 		reconciler.WithRecorder(event.NewAPIRecorder(recorder)),
 	)
-
-	MAX_HELM_HISTORY = env.Int(MAX_HELM_HISTORY_VAR, 10)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
@@ -82,18 +86,43 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (reconcile
 		return nil, errors.New(errNotCR)
 	}
 
-	wf, err := workflows.New(c.rc,
-		cr.GetNamespace(),
-		c.log.WithValues("workflow", cr.GetName()),
-		MAX_HELM_HISTORY,
-	)
+	log := c.log.WithValues("name", cr.Name, "namespace", cr.Namespace)
+
+	getter, err := getter.NewGetter(c.rc)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create dynamic getter")
+	}
+	applier, err := applier.NewApplier(c.rc)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create dynamic applier")
+	}
+	deletor, err := deletor.NewDeletor(c.rc)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create dynamic deletor")
+	}
+
+	helmClient, err := newHelmClient(helmClientOptions{
+		namespace:  cr.GetNamespace(),
+		restConfig: c.rc,
+		logr:       log,
+		verbose:    true,
+	})
+	wf, err := workflows.New(workflows.Opts{
+		Getter:         getter,
+		Applier:        applier,
+		Deletor:        deletor,
+		MaxHelmHistory: MAX_HELM_HISTORY,
+		Log:            log,
+		Namespace:      cr.GetNamespace(),
+		HelmClient:     helmClient,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	return &external{
 		kube: c.kube,
-		log:  c.log,
+		log:  log,
 		wf:   wf,
 		rec:  c.recorder,
 	}, nil
@@ -113,7 +142,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 		return reconciler.ExternalObservation{}, errors.New(errNotCR)
 	}
 
-	got := ptr.Deref(cr.Status.Digest, "")
+	e.log.Info("Observing resource")
+
+	got := cr.Status.Digest
 	if len(got) == 0 && meta.WasDeleted(cr) && cr.GetCondition(rtv1.TypeReady).Reason == rtv1.ReasonDeleting {
 		return reconciler.ExternalObservation{
 			ResourceExists:   false,
@@ -126,7 +157,6 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 	upToDate := (exp == got)
 	if upToDate {
 		cr.SetConditions(rtv1.Available())
-		//err := e.kube.Status().Update(ctx, cr)
 
 		return reconciler.ExternalObservation{
 			ResourceExists:   true,
@@ -155,6 +185,8 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 		return nil
 	}
 
+	e.log.Info("Creating resource")
+
 	cr.SetConditions(rtv1.Creating())
 
 	e.wf.Op(steps.Create)
@@ -167,9 +199,16 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
-	cr.SetConditions(rtv1.Available())
-	cr.Status.Digest = ptr.To(digestForSteps(cr))
+	// Popola lo status con i risultati
+	populateStatus(cr, results)
 
+	e.log.Info(
+		"Workflow completed successfully",
+		"digest", cr.Status.Digest,
+	)
+
+	cr.SetConditions(rtv1.Available())
+	cr.Status.Digest = digestForSteps(cr)
 	return e.kube.Status().Update(ctx, cr)
 }
 
@@ -188,6 +227,8 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 		return nil
 	}
 
+	e.log.Info("Updating resource")
+
 	e.wf.Op(steps.Update)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		return false
@@ -197,8 +238,16 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 		return err
 	}
 
+	// Popola lo status con i risultati
+	populateStatus(cr, results)
+
 	cr.SetConditions(rtv1.Available())
-	cr.Status.Digest = ptr.To(digestForSteps(cr))
+	cr.Status.Digest = digestForSteps(cr)
+
+	e.log.Info(
+		"Workflow completed successfully",
+		"digest", cr.Status.Digest,
+	)
 
 	return e.kube.Status().Update(ctx, cr)
 }
@@ -209,12 +258,12 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotCR)
 	}
 
-	e.log.Debug("Deleting external resource")
-
 	if !meta.IsActionAllowed(cr, meta.ActionDelete) {
 		e.log.Debug("External resource should not be deleted by provider, skip deleting.")
 		return nil
 	}
+
+	e.log.Info("Deleting resource")
 
 	e.wf.Op(steps.Delete)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
@@ -228,7 +277,18 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 	}
 
 	cr.SetConditions(rtv1.Deleting())
-	cr.Status.Digest = ptr.To("")
+	cr.Status.Digest = ""
 
-	return e.kube.Status().Update(ctx, cr)
+	err = e.kube.Status().Update(ctx, cr)
+	if err != nil {
+		e.log.Debug("Failed to update status during deletion", "error", err.Error())
+		return err
+	}
+
+	e.log.Info(
+		"Workflow completed successfully",
+		"digest", cr.Status.Digest,
+	)
+
+	return nil
 }

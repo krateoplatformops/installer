@@ -6,14 +6,7 @@ import (
 	"strings"
 )
 
-// func computeDigest(dat []byte) string {
-// 	hasher := murmur3.New64()
-// 	hasher.Write(dat)
-// 	hasher.Sum64()
-// 	return strconv.FormatUint(hasher.Sum64(), 16)
-// }
-
-func strval(v any) string {
+func Strval(v any) string {
 	switch v := v.(type) {
 	case string:
 		return v
@@ -29,7 +22,7 @@ func strval(v any) string {
 }
 
 // write a func to  bring this to krateo-bff https://raw.githubusercontent.com/matteogastaldello/private-charts/main/krateo-bff-0.18.1.tgz
-func deriveReleaseName(repoUrl string) string {
+func DeriveReleaseName(repoUrl string) string {
 	releaseName := strings.TrimSuffix(path.Base(repoUrl), ".tgz")
 	versionIndex := strings.LastIndex(releaseName, "-")
 	releaseName = releaseName[:versionIndex]
@@ -37,7 +30,7 @@ func deriveReleaseName(repoUrl string) string {
 	return releaseName
 }
 
-func deriveRepoName(repoUrl string) string {
+func DeriveRepoName(repoUrl string) string {
 
 	idx1 := strings.LastIndexByte(repoUrl, '.')
 	idx2 := strings.LastIndexByte(repoUrl, '/')
@@ -50,7 +43,7 @@ func deriveRepoName(repoUrl string) string {
 }
 
 // Ending ellipsis a long string s -> "front..."
-func ellipsis(s string, n int) string {
+func Ellipsis(s string, n int) string {
 	if n <= 3 {
 		return "..."
 	}

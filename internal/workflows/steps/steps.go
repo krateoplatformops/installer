@@ -14,8 +14,8 @@ const (
 	Delete
 )
 
-type Handler interface {
+type Handler[T any] interface {
 	Namespace(ns string)
 	Op(op Op)
-	Handle(ctx context.Context, id string, in *runtime.RawExtension) error
+	Handle(ctx context.Context, id string, in *runtime.RawExtension) (T, error)
 }

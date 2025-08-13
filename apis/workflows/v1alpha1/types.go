@@ -122,9 +122,24 @@ type WorkflowSpec struct {
 	Steps []*Step `json:"steps,omitempty"`
 }
 
+type Release struct {
+	ReleaseName  string      `json:"releaseName,omitempty"`
+	ChartName    string      `json:"chartName,omitempty"`
+	ChartVersion string      `json:"chartVersion,omitempty"`
+	AppVersion   string      `json:"appVersion,omitempty"`
+	Namespace    string      `json:"namespace,omitempty"`
+	Status       string      `json:"status,omitempty"`
+	Revision     int         `json:"revision,omitempty"`
+	Updated      metav1.Time `json:"updated,omitempty"`
+}
+
 type WorkflowStatus struct {
 	rtv1.ConditionedStatus `json:",inline"`
-	Digest                 *string `json:"digest,omitempty"`
+	Digest                 string `json:"digest,omitempty"`
+
+	ObjectList  []Object  `json:"objectList,omitempty"`
+	ReleaseList []Release `json:"releaseList,omitempty"`
+	VarList     []Var     `json:"varList,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -9,23 +9,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/krateoplatformops/installer/internal/dynamic"
+	"github.com/krateoplatformops/installer/internal/dynamic/getter"
 )
 
-// func GetSecret(ctx context.Context, kube client.Client, secretKeySelector rtv1.SecretKeySelector) (string, error) {
-// 	secret := &corev1.Secret{}
-// 	if err := kube.Get(ctx, types.NamespacedName{
-// 		Name:      secretKeySelector.Name,
-// 		Namespace: secretKeySelector.Namespace,
-// 	}, secret); err != nil {
-// 		return "", err
-// 	}
-
-// 	return string(secret.Data[secretKeySelector.Key]), nil
-// }
-
-func GetSecret(ctx context.Context, dyn dynamic.Getter, secretKeySelector rtv1.SecretKeySelector) (string, error) {
-	uns, err := dyn.Get(ctx, dynamic.GetOptions{
+func GetSecret(ctx context.Context, dyn getter.Getter, secretKeySelector rtv1.SecretKeySelector) (string, error) {
+	uns, err := dyn.Get(ctx, getter.GetOptions{
 		GVK:       corev1.SchemeGroupVersion.WithKind("Secret"),
 		Namespace: secretKeySelector.Namespace,
 		Name:      secretKeySelector.Name,
