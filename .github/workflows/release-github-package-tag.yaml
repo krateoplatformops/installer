@@ -121,8 +121,16 @@ jobs:
       - name: Gather dependencies
         run: go mod download
       - name: Run coverage
-        run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+        run: go test -race -tags=unit,integration -p 1 -coverprofile=coverage.txt -timeout 30m -covermode=atomic ./...
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+
+  update-crd-doc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update CRD doc
+        run: |
+          curl -s https://doc.crds.dev/github.com/${{ github.repository }}@${{  github.ref_name }}
