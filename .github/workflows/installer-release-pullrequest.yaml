@@ -60,7 +60,7 @@ jobs:
           push: false
           load: true
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.GHCR_REPO }}/${{ env.MODULE }}:${{ env.LATEST_TAG }}
 
       - name: Inspect local image
         run: |
