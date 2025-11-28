@@ -2,6 +2,10 @@ name: release-pullrequest-kind
 
 on:
   pull_request:
+    paths:
+      - 'installer-chart/**'
+      - 'installer-crd-chart/**'
+      - '.github/workflows/release-pullrequest-kind.yaml'
     branches:
       - main
   workflow_dispatch:
@@ -97,11 +101,17 @@ jobs:
         with:
           node_image: kindest/node:${{ matrix.k8s_version }}
 
-      - name: Install ${{ env.MODULE }} with standard configuration
+      - name: Add Krateo Helm registry
         run: |
           helm repo add krateo https://charts.krateo.io
           helm repo update krateo
+
+      - name: Helm dependencies build
+        run: |
           helm dependencies build ./${{ env.MODULE }}-chart
+
+      - name: Install ${{ env.MODULE }} with standard configuration
+        run: |
           helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart --create-namespace -n krateo-system --wait --timeout=120s
 
       - name: Wait for deployment to become Available
