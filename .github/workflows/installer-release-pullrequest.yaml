@@ -59,6 +59,7 @@ jobs:
           file: ./${{ env.MODULE }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: false
+          load: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
           # Usa cache GitHub anziché push su :cache
@@ -67,7 +68,7 @@ jobs:
 
       - name: List local images
         run: |
-          docker image ls
+          docker images
 
       - name: Inspect local image
         run: |
