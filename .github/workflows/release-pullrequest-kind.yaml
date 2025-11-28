@@ -104,8 +104,10 @@ jobs:
       - name: Install ${{ env.MODULE }}-crd chart
         run: helm install ${{ env.MODULE }}-crd ./${{ env.MODULE }}-crd-chart --create-namespace -n krateo-system --wait
 
-      - name: Install ${{ env.MODULE }}-crd chart
-        run: helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart --create-namespace -n krateo-system --wait
+      - name: Install ${{ env.MODULE }} chart
+        run: |
+          helm dependency build ./${{ env.MODULE }}-chart
+          helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart --create-namespace -n krateo-system --wait
 
       - name: Wait for ${{ env.MODULE }} deployment to become Available
         run: kubectl wait deployment ${{ env.MODULE }} --for condition=Available=True --timeout=120s --namespace krateo-system
