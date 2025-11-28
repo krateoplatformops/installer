@@ -21,4 +21,4 @@ home: https://krateo.io
 icon: "https://github.com/krateoplatformops/krateo/blob/main/docs/media/logo.svg"
 
 sources:
-  - https://github.com/krateoplatformops/installer-chart
+  - https://github.com/krateoplatformops/installer

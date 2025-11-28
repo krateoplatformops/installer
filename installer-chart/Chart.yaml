@@ -23,7 +23,8 @@ version: CHART_VERSION
 # It is recommended to use it with quotes.
 appVersion: APP_VERSION
 
-dependencies:
-  - name: installer-crd
-    version: CHART_VERSION
-    repository: file://../installer-crd-chart
+home: https://krateo.io
+icon: "https://github.com/krateoplatformops/krateo/blob/main/docs/media/logo.svg"
+
+sources:
+  - https://github.com/krateoplatformops/installer
