@@ -65,6 +65,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: List local images
+        run: |
+          docker image ls
+
       - name: Inspect local image
         run: |
           docker buildx imagetools inspect ${{ env.GHCR_REPO }}/${{ env.MODULE }}:${{ env.LATEST_TAG }}
