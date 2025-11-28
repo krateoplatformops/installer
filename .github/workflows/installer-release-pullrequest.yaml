@@ -53,12 +53,13 @@ jobs:
           install: true
 
       - name: Build and NOT push multi-arch image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./${{ env.MODULE }}
           file: ./${{ env.MODULE }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: false
+          load: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
           # Usa cache GitHub anziché push su :cache
