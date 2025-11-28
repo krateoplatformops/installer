@@ -101,20 +101,13 @@ jobs:
         with:
           node_image: kindest/node:${{ matrix.k8s_version }}
 
-      - name: Add Krateo Helm registry
-        run: |
-          helm repo add krateo https://charts.krateo.io
-          helm repo update krateo
+      - name: Install ${{ env.MODULE }}-crd chart
+        run: helm install ${{ env.MODULE }}-crd ./${{ env.MODULE }}-crd-chart --create-namespace -n krateo-system --wait
 
-      - name: Helm dependencies build
-        run: |
-          helm dependencies build ./${{ env.MODULE }}-chart
+      - name: Install ${{ env.MODULE }}-crd chart
+        run: helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart --create-namespace -n krateo-system --wait
 
-      - name: Install ${{ env.MODULE }} with standard configuration
-        run: |
-          helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart --create-namespace -n krateo-system --wait --timeout=120s
-
-      - name: Wait for deployment to become Available
+      - name: Wait for ${{ env.MODULE }} deployment to become Available
         run: kubectl wait deployment ${{ env.MODULE }} --for condition=Available=True --timeout=120s --namespace krateo-system
 
       - name: Helm list -A
