@@ -76,6 +76,7 @@ jobs:
       - name: Inspect local image
         run: |
           docker images
+          docker buildx imagetools inspect ${{ env.GHCR_REPO }}/${{ env.MODULE }}:${{ env.LATEST_TAG }}
 
       - name: Build and NOT push multi-arch image
         uses: docker/build-push-action@v6
