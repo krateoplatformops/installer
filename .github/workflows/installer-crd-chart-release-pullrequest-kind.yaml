@@ -98,9 +98,6 @@ jobs:
         run: |
           helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart --create-namespace -n krateo-system --wait
 
-      - name: Wait for ${{ env.MODULE }} deployment to become Available
-        run: kubectl wait deployment ${{ env.MODULE }} --for condition=Available=True --timeout=120s --namespace krateo-system
-
       - name: Helm list -A
         if: always()
         run: helm list -A
