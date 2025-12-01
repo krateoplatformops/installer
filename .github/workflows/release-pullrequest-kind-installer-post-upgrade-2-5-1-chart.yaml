@@ -1,0 +1,111 @@
+name: release-pullrequest-kind-installer-post-upgrade-2-5-1-chart
+
+on:
+  pull_request:
+    paths:
+      - 'installer-post-upgrade-2-5-1-chart/**'
+      - '.github/workflows/release-pullrequest-kind-installer-post-upgrade-2-5-1-chart.yaml'
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  MODULE: installer-post-upgrade-2-5-1
+  GHCR_REPO: ghcr.io/${{ github.repository }}
+
+jobs:
+  install-kind:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        k8s_version: [ "v1.32.8", "v1.33.4" ]
+
+    steps:
+      - name: Authenticate with GitHub App
+        id: authenticate
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+
+          echo "=== TAGS IN REPO (sorted) ==="
+          git tag -l --sort=-version:refname | cat
+
+          echo
+          echo "=== Searching latest tags for module '${{ env.MODULE }}' ==="
+          APP_VERSION="$(
+            git tag -l '${{ env.MODULE }}/*' --sort=-version:refname \
+            | head -n1 || true
+          )"
+          echo "Raw APP_VERSION tag: '${APP_VERSION}'"
+
+          CHART_VERSION="$(
+            git tag -l '${{ env.MODULE }}-chart/*' --sort=-version:refname \
+            | head -n1 || true
+          )"
+          echo "Raw CHART_VERSION tag: '${CHART_VERSION}'"
+
+          echo
+          echo "=== Applying fallbacks if empty ==="
+          APP_VERSION="${APP_VERSION:-${{ env.MODULE }}/0.0.1}"
+          CHART_VERSION="${CHART_VERSION:-${{ env.MODULE }}-chart/0.0.1}"
+          echo "After fallback → APP_VERSION='${APP_VERSION}'"
+          echo "After fallback → CHART_VERSION='${CHART_VERSION}'"
+
+          echo
+          echo "=== Stripping prefix (keep only part after last '/') ==="
+          APP_VERSION="${APP_VERSION##*/}"
+          CHART_VERSION="${CHART_VERSION##*/}"
+          echo "After strip → APP_VERSION='${APP_VERSION}'"
+          echo "After strip → CHART_VERSION='${CHART_VERSION}'"
+
+          {
+            echo "APP_VERSION=$APP_VERSION"
+            echo "CHART_VERSION=$CHART_VERSION"
+          } >> "$GITHUB_ENV"
+
+      - name: Echo
+        run: |
+          echo "APP_VERSION=${{ env.APP_VERSION }}"
+          echo "CHART_VERSION=${{ env.CHART_VERSION }}"
+
+      - name: Replace CHART_VERSION in ./${{ env.MODULE }}-chart/Chart.yaml
+        run: sed -i 's/CHART_VERSION/${{ env.CHART_VERSION }}/g' ./${{ env.MODULE }}-chart/Chart.yaml
+
+      - name: Replace APP_VERSION in ./${{ env.MODULE }}-chart/Chart.yaml
+        run: sed -i 's/APP_VERSION/${{ env.APP_VERSION }}/g' ./${{ env.MODULE }}-chart/Chart.yaml
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.1.0
+
+      - name: Helm lint chart
+        run: helm lint ./${{ env.MODULE }}-chart
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1
+        with:
+          node_image: kindest/node:${{ matrix.k8s_version }}
+
+      - name: Install ${{ env.MODULE }} chart
+        run: |
+          helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart --create-namespace -n krateo-system --wait
+
+      - name: Helm list -A
+        if: always()
+        run: helm list -A
+
+      - name: Get deployments -A
+        if: always()
+        run: kubectl get deployments -A
+
+      - name: Get events -A
+        if: always()
+        run: kubectl get events -A --sort-by='.lastTimestamp'
