@@ -31,17 +31,6 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "LATEST_TAG=latest" >> $GITHUB_ENV
 
-      - name: Set up Docker
-        uses: docker/setup-docker-action@v4
-        with:
-          daemon-config: |
-            {
-              "debug": true,
-              "features": {
-                "containerd-snapshotter": true
-              }
-            }
-
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -62,21 +51,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           install: true
-
-      - name: Build and export to Docker
-        uses: docker/build-push-action@v6
-        with:
-          context: ./${{ env.MODULE }}
-          file: ./${{ env.MODULE }}/Dockerfile
-          push: false
-          load: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ env.GHCR_REPO }}/${{ env.MODULE }}:${{ env.LATEST_TAG }}
-
-      - name: Inspect local image
-        run: |
-          docker images
-          docker buildx imagetools inspect ${{ env.GHCR_REPO }}/${{ env.MODULE }}:${{ env.LATEST_TAG }}
 
       - name: Build and NOT push multi-arch image
         uses: docker/build-push-action@v6
