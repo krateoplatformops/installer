@@ -59,17 +59,22 @@ spec:
               set -euo pipefail
 
               echo "Step 1) Add & update 'marketplace' repo ..."
-              helm repo add marketplace https://marketplace.krateo.io
-              helm repo update marketplace
+              helm repo add marketplace https://marketplace.krateo.io \
+                || echo "WARN: Failed to add 'marketplace' repo"
+
+              helm repo update marketplace \
+                || echo "WARN: Failed to update 'marketplace' repo"
 
               echo "Step 2) Uninstall old 'portal' release if present ..."
-              helm uninstall portal -n {{ .Release.Namespace }} || true
+              helm uninstall portal -n {{ .Release.Namespace }} \
+                || echo "WARN: Failed to uninstall old 'portal' release (maybe not installed?)"
 
               echo "Step 3) Install 'portal' from marketplace ..."
               helm install portal marketplace/portal \
                 -n {{ .Release.Namespace }} \
                 --version 1.0.0 \
-                --wait
+                --wait \
+                || echo "WARN: Failed to install 'portal' chart from marketplace"
 
               echo "Post-upgrade 2.5.1 job done ✅"
 {{- end }}

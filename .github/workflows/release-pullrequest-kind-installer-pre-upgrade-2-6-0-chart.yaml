@@ -12,6 +12,8 @@ on:
 env:
   MODULE: installer-pre-upgrade-2-6-0
   GHCR_REPO: ghcr.io/${{ github.repository }}
+  INSTALL_CRDS: "false"
+  HAS_DEPLOYMENT: "false"
 
 jobs:
   install-kind:
@@ -94,9 +96,20 @@ jobs:
         with:
           node_image: kindest/node:${{ matrix.k8s_version }}
 
+      - name: Install ${{ env.MODULE }}-crd chart
+        if: env.INSTALL_CRDS == 'true'
+        run: |
+          helm repo add krateo https://charts.krateo.io
+          helm repo update krateo
+          helm install ${{ env.MODULE }}-crd krateo/${{ env.MODULE }}-crd --create-namespace -n krateo-system --wait --timeout=120s
+
       - name: Install ${{ env.MODULE }} chart
         run: |
           helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart --create-namespace -n krateo-system --wait
+
+      - name: Wait for ${{ env.MODULE }} deployment to become Available
+        if: env.HAS_DEPLOYMENT == 'true'
+        run: kubectl wait deployment ${{ env.MODULE }} --for condition=Available=True --timeout=120s --namespace krateo-system
 
       - name: Helm list -A
         if: always()
