@@ -1,21 +1,17 @@
-name: installer-release-pullrequest
+name: installer-release-tag-installer
 
 on:
-  pull_request:
-    paths:
-      - 'installer/**'
-      - '.github/workflows/installer-release-pullrequest.yaml'
-    branches:
-      - main
-  workflow_dispatch:
+  push:
+    tags:
+      - 'installer/[0-9]+.[0-9]+.[0-9]+'
 
 env:
   MODULE: installer
   GHCR_REPO: ghcr.io/${{ github.repository }}
 
 jobs:
-  build-and-not-push:
-    name: Build and NOT Push Multi-Arch Image
+  build-and-push:
+    name: Build and Push Multi-Arch Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,12 +48,17 @@ jobs:
         with:
           install: true
 
-      - name: Build and NOT push multi-arch image
-        uses: docker/build-push-action@v6
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v5
         with:
-          context: ./${{ env.MODULE }}
-          file: ./${{ env.MODULE }}/Dockerfile
+          context: ./sweeper
+          file: ./sweeper/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: false
+          push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Inspect pushed image
+        run: |
+          docker buildx imagetools inspect ${{ env.GHCR_REPO }}/${{ env.MODULE }}:${{ env.VERSION }}
+          docker buildx imagetools inspect ${{ env.GHCR_REPO }}/${{ env.MODULE }}:${{ env.LATEST_TAG }}
