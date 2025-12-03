@@ -222,8 +222,10 @@ jobs:
 
       - name: Wait for krateoplatformops krateo to become ready
         run: |
-          kubectl wait krateoplatformops.krateo.io ${{ env.MODULE }} --for condition=Ready=True \
-            --timeout=600s --namespace krateo-system \ 
+          kubectl wait krateoplatformops.krateo.io/${{ env.MODULE }} \
+            --for condition=Ready=True \
+            --timeout=600s \
+            --namespace=krateo-system \
             --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Get Krateo PlatformOps CR status on ManagedCluster
