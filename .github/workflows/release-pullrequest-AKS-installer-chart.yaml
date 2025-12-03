@@ -198,12 +198,12 @@ jobs:
           helm install ${{ env.MODULE }}-crd krateo/${{ env.MODULE }}-crd \
             --create-namespace -n krateo-system --wait \
             --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
-            
 
       - name: Install ${{ env.MODULE }} chart
         run: |
           helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart \
-            --create-namespace -n krateo-system --wait \ --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml \
+            --create-namespace -n krateo-system --wait \
+            --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml \
             --set krateoplatformops.service.type=LoadBalancer \
             --set krateoplatformops.service.externalIpAvailable=true
 
