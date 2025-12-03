@@ -15,11 +15,11 @@ env:
   HAS_DEPLOYMENT: "true"
 
 jobs:
-  install-kind:
+  install-AKS:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        k8s_version: [ "v1.32.8", "v1.33.4" ]
+        k8s_version: [ "1.32.7", "1.33.3" ]
 
     steps:
       - name: Authenticate with GitHub App
@@ -176,7 +176,7 @@ jobs:
               type: SystemAssigned
           EOF
 
-      - name: Wait for ManagedCluster Provisioning
+      - name: Get ManagedCluster Provisioning
         run: |
           kubectl get managedcluster/managedcluster-$K8S_VERSION_NODOT -o yaml
 
