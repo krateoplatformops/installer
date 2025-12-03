@@ -190,15 +190,38 @@ jobs:
           echo "Extracting kubeconfig from secret..."
           kubectl get secret managedcluster-$K8S_VERSION_NODOT-kubeconfig -o jsonpath='{.data.kubeconfig}' | base64 -d > managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
-      - name: Install Krateo PlatformOps with standard configuration
-        run: helm install installer-$K8S_VERSION_NODOT ./chart --create-namespace -n krateo-system-$K8S_VERSION_NODOT --wait --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --set krateoplatformops.finopsoperatorcratedb.env.CRATEDB_OPERATOR_DEBUG_VOLUME_STORAGE_CLASS=default --set krateoplatformops.finopscratedbcustomresource.resources.disk.storageClass=default --set krateoplatformops.finopscratedbcustomresource.resources.disk.storageClass=default --set krateoplatformops.service.type=LoadBalancer --set krateoplatformops.service.externalIpAvailable=true
+      - name: Install ${{ env.MODULE }}-crd chart
+        if: env.INSTALL_CRDS == 'true'
+        run: |
+          helm repo add krateo https://charts.krateo.io
+          helm repo update krateo
+          helm install ${{ env.MODULE }}-crd krateo/${{ env.MODULE }}-crd \
+            --create-namespace -n krateo-system --wait \
+            --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+            
+
+      - name: Install ${{ env.MODULE }} chart
+        run: |
+          helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart \
+            --create-namespace -n krateo-system --wait \ --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml \
+            --set krateoplatformops.service.type=LoadBalancer \
+            --set krateoplatformops.service.externalIpAvailable=true
+
+      - name: Wait for ${{ env.MODULE }} deployment to become Available
+        if: env.HAS_DEPLOYMENT == 'true'
+        run: |
+          kubectl wait deployment ${{ env.MODULE }} --for condition=Available=True \
+            --timeout=120s --namespace krateo-system \
+            --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Wait for krateoplatformops krateo to become ready
-        run: kubectl wait krateoplatformops krateo --for condition=Ready=True --timeout=600s --namespace krateo-system-$K8S_VERSION_NODOT --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: |
+          kubectl wait krateoplatformops ${{ env.MODULE }} --for condition=Ready=True --timeout=600s \
+            --namespace krateo-system-$K8S_VERSION_NODOT \ --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Get Krateo PlatformOps CR status on ManagedCluster
         if: always()
-        run: kubectl get krateoplatformops krateo --namespace krateo-system-$K8S_VERSION_NODOT --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml -o yaml
+        run: kubectl get krateoplatformops ${{ env.MODULE }} --namespace krateo-system-$K8S_VERSION_NODOT --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml -o yaml
 
       - name: Get events on ManagedCluster
         if: always()
