@@ -238,11 +238,11 @@ jobs:
 
       - name: Clean Up Krateo PlatformOps CR on ManagedCluster
         if: always()
-        run: kubectl delete krateoplatformops krateo --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: kubectl delete krateoplatformops ${{ env.MODULE }} --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Clean Up Installer Helm Chart on ManagedCluster
         if: always()
-        run: helm uninstall installer-$K8S_VERSION_NODOT --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: helm uninstall ${{ env.MODULE }} --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Clean Up krateo-system namespace on ManagedCluster
         if: always()
