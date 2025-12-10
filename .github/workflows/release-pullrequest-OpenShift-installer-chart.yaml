@@ -249,7 +249,7 @@ jobs:
           echo "Deploying OpenShiftCluster openshiftcluster-$K8S_VERSION_NODOT with Kubernetes version ${{ matrix.k8s_version }}..."
           cat <<EOF | kubectl apply -f -
           apiVersion: redhatopenshift.azure.com/v1api20231122
-          kind: adminCredentials
+          kind: OpenShiftCluster
           metadata:
             name: openshiftcluster-$K8S_VERSION_NODOT
           spec:
