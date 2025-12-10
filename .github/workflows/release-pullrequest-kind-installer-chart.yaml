@@ -112,7 +112,9 @@ jobs:
         run: kubectl wait deployment ${{ env.MODULE }} --for condition=Available=True --timeout=120s --namespace krateo-system
 
       - name: Wait for krateoplatformops krateo to become ready
-        run: kubectl wait krateoplatformops  ${{ env.MODULE }} --for condition=Ready=True --timeout=900s --namespace krateo-system
+        run: |
+          kubectl get krateoplatformops -A 
+          kubectl wait krateoplatformops ${{ env.MODULE }} --for condition=Ready=True --timeout=900s --namespace krateo-system
 
       - name: Helm list -A
         if: always()
