@@ -376,35 +376,35 @@ krateoplatformops:
       # Max backend DB size (bytes) before etcd raises NOSPACE alarm.
       # With a 6Gi PVC, 3Gi (50% of disk) is a safe recommended quota.
       quotaBackendBytes: "3221225472"   # 3 * 1024^3
-  sweeper:
-    chart:
-      name: sweeper
-      version: 0.2.0
-      repository: https://charts.krateo.io
-      wait: true
-      waitTimeout: 5m
-      # # Use with private helm registry
-      # credentials:
-      #   username: username
-      #   passwordRef: # reference to a secret
-      #     key: token
-      #     name: helm-registry-token
-      #     namespace: krateo-system
-    fullnameOverride: ""
-    resources: {}
-    podSecurityContext: {}
-    securityContext: {}
-    image:
-      repository: ghcr.io/krateoplatformops/eventstack/sweeper
-      pullPolicy: IfNotPresent
-      # Overrides the image tag whose default is the chart appVersion.
-      tag: ""
-    # imagePullSecrets:
-    #   - name: image-registry-secret
-    env: {}
-      # DEBUG: "true"
-      # CLEANUP_THRESHOLD: 0.7
-      # MONITORING_INTERVAL: 15s
+    sweeper:
+      chart:
+        name: sweeper
+        version: 0.2.0
+        repository: https://charts.krateo.io
+        wait: true
+        waitTimeout: 5m
+        # # Use with private helm registry
+        # credentials:
+        #   username: username
+        #   passwordRef: # reference to a secret
+        #     key: token
+        #     name: helm-registry-token
+        #     namespace: krateo-system
+      fullnameOverride: ""
+      resources: {}
+      podSecurityContext: {}
+      securityContext: {}
+      image:
+        repository: ghcr.io/krateoplatformops/eventstack/sweeper
+        pullPolicy: IfNotPresent
+        # Overrides the image tag whose default is the chart appVersion.
+        tag: ""
+      # imagePullSecrets:
+      #   - name: image-registry-secret
+      env: {}
+        # DEBUG: "true"
+        # CLEANUP_THRESHOLD: 0.7
+        # MONITORING_INTERVAL: 15s
   frontend:
     chart:
       name: frontend
