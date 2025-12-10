@@ -645,7 +645,7 @@ krateoplatformops:
   finopsdatabasehandler:
     chart:
       name: finops-database-handler
-      version: 0.5.2
+      version: 0.5.3
       repository: https://charts.krateo.io
       wait: true
       waitTimeout: 5m
