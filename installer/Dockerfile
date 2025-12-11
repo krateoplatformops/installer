@@ -1,5 +1,5 @@
 # Build phase
-FROM golang:1.24-bookworm as builder
+FROM golang:1.25-bookworm AS builder
 LABEL stage=builder
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -29,10 +29,10 @@ RUN CGO_ENABLED=0 GO111MODULE=on go build -a -o /bin/manager main.go && \
 
 # Deployment environment
 # ----------------------
-FROM golang:1.24-alpine3.21
+FROM gcr.io/distroless/static:nonroot
 
-ENV GOCACHE='/tmp/.cache'
-RUN mkdir -p "$GOCACHE/go-build" && chmod -R 1777 "$GOCACHE"
+# ENV GOCACHE='/tmp/.cache'
+# RUN mkdir -p "$GOCACHE/go-build" && chmod -R 1777 "$GOCACHE"
 
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
