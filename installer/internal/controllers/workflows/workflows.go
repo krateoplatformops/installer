@@ -107,6 +107,9 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (reconcile
 		logr:       log,
 		verbose:    true,
 	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create helm client")
+	}
 	wf, err := workflows.New(workflows.Opts{
 		Getter:         getter,
 		Applier:        applier,
@@ -142,7 +145,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (reconciler
 		return reconciler.ExternalObservation{}, errors.New(errNotCR)
 	}
 
-	e.log.Info("Observing resource")
+	log := e.log.WithValues("name", cr.Name, "namespace", cr.Namespace)
+
+	log.Info("Observing resource")
 
 	got := cr.Status.Digest
 	if len(got) == 0 && meta.WasDeleted(cr) && cr.GetCondition(rtv1.TypeReady).Reason == rtv1.ReasonDeleting {
@@ -175,19 +180,26 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotCR)
 	}
+	log := e.log.WithValues("name", cr.Name, "namespace", cr.Namespace, "operation", "create")
 
 	if meta.WasDeleted(cr) {
+		e.log.Info("Resource was deleted, skipping creation")
 		return nil
 	}
 
 	if !meta.IsActionAllowed(cr, meta.ActionCreate) {
-		e.log.Debug("External resource should not be updated by provider, skip creating.")
+		log.Warn("External resource should not be updated by provider, skip creating.")
 		return nil
 	}
 
-	e.log.Info("Creating resource")
+	log.Info("Creating resource")
 
 	cr.SetConditions(rtv1.Creating())
+	err := e.kube.Status().Update(ctx, cr)
+	if err != nil {
+		log.Error(err, "Failed to update status before creating resource")
+		return err
+	}
 
 	e.wf.Op(steps.Create)
 
@@ -195,14 +207,14 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) error {
 		return false
 	})
 	if err := workflows.Err(results); err != nil {
-		e.log.Debug("Worflow failure", "error", err.Error())
+		log.Error(err, "Workflow failure")
 		return err
 	}
 
 	// Popola lo status con i risultati
 	populateStatus(cr, results)
 
-	e.log.Info(
+	log.Info(
 		"Workflow completed successfully",
 		"digest", cr.Status.Digest,
 	)
@@ -217,24 +229,33 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotCR)
 	}
+	log := e.log.WithValues("name", cr.Name, "namespace", cr.Namespace, "operation", "update")
 
 	if meta.WasDeleted(cr) {
+		e.log.Info("Resource was deleted, skipping updating")
 		return nil
 	}
 
 	if !meta.IsActionAllowed(cr, meta.ActionUpdate) {
-		e.log.Debug("External resource should not be updated by provider, skip updating.")
+		log.Warn("update not allowed", "External resource should not be updated by provider, skip updating.")
 		return nil
 	}
 
-	e.log.Info("Updating resource")
+	// Set creatimg condition to show that update is in progress
+	cr.SetConditions(rtv1.Creating())
+	err := e.kube.Status().Update(ctx, cr)
+	if err != nil {
+		log.Error(err, "Failed to update status before updating resource")
+		return err
+	}
 
+	log.Info("Updating resource")
 	e.wf.Op(steps.Update)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		return false
 	})
 	if err := workflows.Err(results); err != nil {
-		e.log.Debug("Worflow failure", "error", err.Error())
+		log.Error(err, "Workflow failure")
 		return err
 	}
 
@@ -244,7 +265,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) error {
 	cr.SetConditions(rtv1.Available())
 	cr.Status.Digest = digestForSteps(cr)
 
-	e.log.Info(
+	log.Info(
 		"Workflow completed successfully",
 		"digest", cr.Status.Digest,
 	)
@@ -257,22 +278,30 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotCR)
 	}
+	log := e.log.WithValues("name", cr.Name, "namespace", cr.Namespace, "operation", "delete")
 
 	if !meta.IsActionAllowed(cr, meta.ActionDelete) {
-		e.log.Debug("External resource should not be deleted by provider, skip deleting.")
+		log.Warn("External resource should not be deleted by provider, skip deleting.")
 		return nil
 	}
 
-	e.log.Info("Deleting resource")
+	log.Info("Deleting resource")
+
+	cr.SetConditions(rtv1.Deleting())
+	err := e.kube.Status().Update(ctx, cr)
+	if err != nil {
+		log.Error(err, "Failed to update status before deleting resource")
+		return err
+	}
 
 	e.wf.Op(steps.Delete)
 	results := e.wf.Run(ctx, cr.Spec.DeepCopy(), func(s *workflowsv1alpha1.Step) bool {
 		return s.Type == workflowsv1alpha1.TypeVar
 	})
 
-	err := workflows.Err(results)
+	err = workflows.Err(results)
 	if err != nil {
-		e.log.Debug("Worflow failure", "op", "delete", "error", err.Error())
+		log.Error(err, "Workflow failure")
 		return err
 	}
 
@@ -281,11 +310,11 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) error {
 
 	err = e.kube.Status().Update(ctx, cr)
 	if err != nil {
-		e.log.Debug("Failed to update status during deletion", "error", err.Error())
+		log.Error(err, "Failed to update status during deletion")
 		return err
 	}
 
-	e.log.Info(
+	log.Info(
 		"Workflow completed successfully",
 		"digest", cr.Status.Digest,
 	)
