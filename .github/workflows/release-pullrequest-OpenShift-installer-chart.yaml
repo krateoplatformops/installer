@@ -366,11 +366,11 @@ jobs:
             --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Wait for krateoplatformops krateo to become ready
-        run: kubectl wait krateoplatformops krateo --for condition=Ready=True --timeout=600s --namespace krateo-system-$K8S_VERSION_NODOT --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: kubectl wait krateoplatformops krateo --for condition=Ready=True --timeout=600s --namespace krateo-system--kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Get Krateo PlatformOps CR status on OpenShiftCluster
         if: always()
-        run: kubectl get krateoplatformops krateo --namespace krateo-system-$K8S_VERSION_NODOT --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml -o yaml
+        run: kubectl get krateoplatformops krateo --namespace krateo-system--kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml -o yaml
 
       - name: Get events on OpenShiftCluster
         if: always()
@@ -378,15 +378,15 @@ jobs:
 
       - name: Clean Up Krateo PlatformOps CR on OpenShiftCluster
         if: always()
-        run: kubectl delete krateoplatformops krateo --namespace krateo-system-$K8S_VERSION_NODOT --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: kubectl delete krateoplatformops krateo --namespace krateo-system--kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Clean Up Installer Helm Chart on OpenShiftCluster
         if: always()
-        run: helm uninstall installer-$K8S_VERSION_NODOT --namespace krateo-system-$K8S_VERSION_NODOT --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: helm uninstall installer-$K8S_VERSION_NODOT --namespace krateo-system--kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Clean Up krateo-system namespace on OpenShiftCluster
         if: always()
-        run: kubectl delete namespace krateo-system-$K8S_VERSION_NODOT --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: kubectl delete namespace krateo-system--kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Clean Up OpenShiftCluster Resource
         if: always()
