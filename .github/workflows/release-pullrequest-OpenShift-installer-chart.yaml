@@ -330,8 +330,8 @@ jobs:
       - name: Retrieve OpenShiftCluster Kubeconfig
         run: |
           echo "Extracting kubeconfig from secret..."
-          kubectl get secret admincredentials -o jsonpath='{.data.admincredentials}' | base64 -d > openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
-          echo "openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml..."
+          kubectl get secret admincredentials -o jsonpath='{.data.admincredentials}' | base64 -d | base64 -d > openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+          echo "cat openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml..."
           cat openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Install ${{ env.MODULE }}-crd chart
