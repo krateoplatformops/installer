@@ -322,7 +322,10 @@ jobs:
       # TO DELETE 
       - name: Get secrets
         if: always()
-        run: kubectl get secrets -A
+        run: |
+          kubectl get secrets -A
+          kubectl get secret admincredentials -o yaml
+          kubectl get seceet credentials -o yaml
 
       - name: Retrieve OpenShiftCluster Kubeconfig
         run: |
