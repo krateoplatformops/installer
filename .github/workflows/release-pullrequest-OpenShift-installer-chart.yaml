@@ -331,6 +331,8 @@ jobs:
         run: |
           echo "Extracting kubeconfig from secret..."
           kubectl get secret admincredentials -o jsonpath='{.data.admincredentials}' | base64 -d > openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+          echo "openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml..."
+          cat openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Install ${{ env.MODULE }}-crd chart
         if: env.INSTALL_CRDS == 'true'
