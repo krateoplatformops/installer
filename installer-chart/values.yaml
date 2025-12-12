@@ -300,7 +300,7 @@ krateoplatformops:
       repository: ghcr.io/krateoplatformops/eventstack/eventrouter
       pullPolicy: IfNotPresent
       # Overrides the image tag whose default is the chart appVersion.
-      tag: ""
+      tag: "0.5.9"
     # imagePullSecrets:
     #   - name: image-registry-secret
     env: {}
@@ -446,7 +446,7 @@ krateoplatformops:
     enabled: true
     chart:
       name: portal
-      version: 1.1.0
+      version: 1.2.0
       repository: https://marketplace.krateo.io
       wait: true
       waitTimeout: 5m
