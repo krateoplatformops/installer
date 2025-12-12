@@ -383,11 +383,11 @@ jobs:
 
       - name: Clean Up Installer Helm Chart on OpenShiftCluster
         if: always()
-        run: helm uninstall installer-$K8S_VERSION_NODOT --namespace krateo-system --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --kube-insecure-skip-tls-verify
+        run: helm uninstall ${{ env.MODULE }} --namespace krateo-system --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --kube-insecure-skip-tls-verify
 
       - name: Clean Up krateo-system namespace on OpenShiftCluster
         if: always()
-        run: kubectl delete namespace krateo-syste --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --insecure-skip-tls-verify=true
+        run: kubectl delete namespace krateo-system --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --insecure-skip-tls-verify=true
 
       - name: Clean Up OpenShiftCluster Resource
         if: always()
