@@ -367,8 +367,8 @@ jobs:
 
       - name: Wait for krateoplatformops krateo to become ready
         run: |
-          kubectl get krateoplatformops -A
-          kubectl wait krateoplatformops krateo --for condition=Ready=True --timeout=600s --namespace krateo-system--kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --insecure-skip-tls-verify=true
+          kubectl get krateoplatformops -A --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --insecure-skip-tls-verify=true
+          kubectl wait krateoplatformops krateo --for condition=Ready=True --timeout=600s --namespace krateo-system --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --insecure-skip-tls-verify=true
 
       - name: Get Krateo PlatformOps CR status on OpenShiftCluster
         if: always()
