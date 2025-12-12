@@ -372,7 +372,7 @@ jobs:
 
       - name: Get Krateo PlatformOps CR status on OpenShiftCluster
         if: always()
-        run: kubectl get krateoplatformops krateo --namespace krateo-system--kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml -o yaml --insecure-skip-tls-verify=true
+        run: kubectl get krateoplatformops krateo --namespace krateo-system --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml -o yaml --insecure-skip-tls-verify=true
 
       - name: Get events on OpenShiftCluster
         if: always()
