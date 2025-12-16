@@ -190,6 +190,8 @@ jobs:
           spec:
             cidrBlocks: 
               - 10.0.0.0/16
+            enableDNSSupport: true
+            enableDNSHostnames: true
           EOF
 
       - name: Wait for VPC Provisioning
@@ -202,54 +204,54 @@ jobs:
         run: |
           kubectl get vpc/cluster-$K8S_VERSION_NODOT -o yaml
 
-      # - name: Create Internet Gateway
-      #   run: |
-      #     echo "Creating Internet Gateway..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: InternetGateway
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-igw
-      #     spec:
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-igw
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #     EOF
+      - name: Create Internet Gateway
+        run: |
+          echo "Creating Internet Gateway..."
+          cat <<EOF | kubectl apply -f -
+          apiVersion: ec2.services.k8s.aws/v1alpha1
+          kind: InternetGateway
+          metadata:
+            name: cluster-$K8S_VERSION_NODOT-igw
+          spec:
+            tags:
+              - key: Name
+                value: cluster-$K8S_VERSION_NODOT-igw
+            vpcRef:
+              from:
+                name: cluster-$K8S_VERSION_NODOT
+          EOF
 
-      # - name: Wait for Internet Gateway Provisioning
-      #   run: |
-      #     echo "Waiting for Internet Gateway to become ready..."
-      #     kubectl wait --for=condition=ACK.ResourceSynced --timeout=300s internetgateway/cluster-$K8S_VERSION_NODOT-igw
+      - name: Wait for Internet Gateway Provisioning
+        run: |
+          echo "Waiting for Internet Gateway to become ready..."
+          kubectl wait --for=condition=ACK.ResourceSynced --timeout=300s internetgateway/cluster-$K8S_VERSION_NODOT-igw
 
-      # - name: Create Public Route Table
-      #   run: |
-      #     echo "Creating Public Route Table..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: RouteTable
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-public-rt
-      #     spec:
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-public-rt
-      #       routes:
-      #       - destinationCIDRBlock: 0.0.0.0/0
-      #         gatewayRef:
-      #           from:
-      #             name: cluster-$K8S_VERSION_NODOT-igw
-      #     EOF
+      - name: Create Public Route Table
+        run: |
+          echo "Creating Public Route Table..."
+          cat <<EOF | kubectl apply -f -
+          apiVersion: ec2.services.k8s.aws/v1alpha1
+          kind: RouteTable
+          metadata:
+            name: cluster-$K8S_VERSION_NODOT-public-rt
+          spec:
+            vpcRef:
+              from:
+                name: cluster-$K8S_VERSION_NODOT
+            tags:
+              - key: Name
+                value: cluster-$K8S_VERSION_NODOT-public-rt
+            routes:
+            - destinationCIDRBlock: 0.0.0.0/0
+              gatewayRef:
+                from:
+                  name: cluster-$K8S_VERSION_NODOT-igw
+          EOF
 
-      # - name: Wait for Route Table Provisioning
-      #   run: |
-      #     echo "Waiting for Route Table to become ready..."
-      #     kubectl wait --for=condition=ACK.ResourceSynced --timeout=300s routetable/cluster-$K8S_VERSION_NODOT-public-rt
+      - name: Wait for Route Table Provisioning
+        run: |
+          echo "Waiting for Route Table to become ready..."
+          kubectl wait --for=condition=ACK.ResourceSynced --timeout=300s routetable/cluster-$K8S_VERSION_NODOT-public-rt
 
       - name: Deploy Public Subnet-1 CR via EC2 Controller
         run: |
@@ -262,6 +264,7 @@ jobs:
           spec:
             cidrBlock: 10.0.1.0/24
             availabilityZone: eu-central-1a
+            mapPublicIPOnLaunch: true
             vpcRef: 
               from: 
                 name: cluster-$K8S_VERSION_NODOT
@@ -288,6 +291,7 @@ jobs:
           spec:
             cidrBlock: 10.0.2.0/24
             availabilityZone: eu-central-1b
+            mapPublicIPOnLaunch: true
             vpcRef: 
               from: 
                 name: cluster-$K8S_VERSION_NODOT
