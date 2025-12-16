@@ -681,7 +681,7 @@ jobs:
 
       - name: Get deployments
         if: always()
-        run: kubectl get deployments -n
+        run: kubectl get deployments -A
 
       - name: Clean Up Sensitive Files
         if: always()
