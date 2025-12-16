@@ -1,10 +1,18 @@
-name: release-pullrequest-EKS
+name: release-pullrequest-EKS-installer-chart
 
 on:
   pull_request:
+    paths:
+      - '.github/workflows/release-pullrequest-EKS-installer-chart.yaml'
     branches:
       - main
   workflow_dispatch:
+
+env:
+  MODULE: installer
+  GHCR_REPO: ghcr.io/${{ github.repository }}
+  INSTALL_CRDS: "true"
+  HAS_DEPLOYMENT: "true"
 
 jobs:
   install-EKS:
@@ -14,28 +22,6 @@ jobs:
         k8s_version: [ "1.32", "1.31" ]
 
     steps:
-      - name: Extract and Store Trimmed Repository Name
-        run: |
-          REPO_CHART_NAME="${{ github.repository }}"
-          REPO_APP_NAME=$(echo "$REPO_CHART_NAME" | sed 's/-chart$//')  # Remove "-chart" suffix if present
-          
-          # Check if the trimmed repo exists
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/$REPO_APP_NAME")
-
-          if [[ "$HTTP_STATUS" -eq 200 ]]; then
-            echo "Using trimmed repository name: $REPO_APP_NAME"
-            echo "REPO_APP_NAME=$REPO_APP_NAME" >> $GITHUB_ENV
-          else
-            echo "Trimmed repository not found. Falling back to original repository name."
-            echo "REPO_APP_NAME=$REPO_CHART_NAME" >> $GITHUB_ENV
-          fi
-
-      - name: Use the Stored Variable
-        run: |
-          echo "Trimmed Repository Name: ${{ env.REPO_APP_NAME }}"
-
       - name: Authenticate with GitHub App
         id: authenticate
         uses: tibdex/github-app-token@v1
@@ -43,44 +29,73 @@ jobs:
           app_id: ${{ secrets.APP_ID }}
           private_key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Extract latest App Version
-        uses: tdemin/find-latest-tag@v1
-        id: app_version
-        with:
-          repo: https://${{ steps.authenticate.outputs.token }}@github.com/${{ env.REPO_APP_NAME }}.git
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Extract latest Chart Version
-        uses: tdemin/find-latest-tag@v1
-        id: chart_version
-        with:
-          repo: https://${{ steps.authenticate.outputs.token }}@github.com/${{ github.repository }}.git
-
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Print latest Chart Version
+      - name: Extract version
         run: |
-          echo APP_VERSION:${{steps.app_version.outputs.tag}}
-          echo CHART_VERSION:${{steps.chart_version.outputs.tag}}
+          set -euo pipefail
+          git fetch --tags --force
 
-      - name: Replace Chart Version in Chart.yaml
-        run: sed -i 's/CHART_VERSION/${{ steps.chart_version.outputs.tag }}/g' ./chart/Chart.yaml
+          echo "=== TAGS IN REPO (sorted) ==="
+          git tag -l --sort=-version:refname | cat
 
-      - name: Replace App Version in Chart.yaml
-        run: sed -i 's/APP_VERSION/${{ steps.app_version.outputs.tag }}/g' ./chart/Chart.yaml
+          echo
+          echo "=== Searching latest tags for module '${{ env.MODULE }}' ==="
+          APP_VERSION="$(
+            git tag -l '${{ env.MODULE }}/*' --sort=-version:refname \
+            | head -n1 || true
+          )"
+          echo "Raw APP_VERSION tag: '${APP_VERSION}'"
 
-      # Prepare a sanitized version string (replace '.' with '-') and store it in K8S_VERSION_NODOT
-      - name: Prepare version variable
-        run: echo "K8S_VERSION_NODOT=$(echo '${{ matrix.k8s_version }}' | tr '.' '-')" >> $GITHUB_ENV
+          CHART_VERSION="$(
+            git tag -l '${{ env.MODULE }}-chart/*' --sort=-version:refname \
+            | head -n1 || true
+          )"
+          echo "Raw CHART_VERSION tag: '${CHART_VERSION}'"
+
+          echo
+          echo "=== Applying fallbacks if empty ==="
+          APP_VERSION="${APP_VERSION:-${{ env.MODULE }}/0.0.1}"
+          CHART_VERSION="${CHART_VERSION:-${{ env.MODULE }}-chart/0.0.1}"
+          echo "After fallback → APP_VERSION='${APP_VERSION}'"
+          echo "After fallback → CHART_VERSION='${CHART_VERSION}'"
+
+          echo
+          echo "=== Stripping prefix (keep only part after last '/') ==="
+          APP_VERSION="${APP_VERSION##*/}"
+          CHART_VERSION="${CHART_VERSION##*/}"
+          echo "After strip → APP_VERSION='${APP_VERSION}'"
+          echo "After strip → CHART_VERSION='${CHART_VERSION}'"
+
+          {
+            echo "APP_VERSION=$APP_VERSION"
+            echo "CHART_VERSION=$CHART_VERSION"
+          } >> "$GITHUB_ENV"
+
+      - name: Echo
+        run: |
+          echo "APP_VERSION=${{ env.APP_VERSION }}"
+          echo "CHART_VERSION=${{ env.CHART_VERSION }}"
+
+      - name: Replace CHART_VERSION in ./${{ env.MODULE }}-chart/Chart.yaml
+        run: sed -i 's/CHART_VERSION/${{ env.CHART_VERSION }}/g' ./${{ env.MODULE }}-chart/Chart.yaml
+
+      - name: Replace APP_VERSION in ./${{ env.MODULE }}-chart/Chart.yaml
+        run: sed -i 's/APP_VERSION/${{ env.APP_VERSION }}/g' ./${{ env.MODULE }}-chart/Chart.yaml
 
       - name: Set up Helm
         uses: azure/setup-helm@v4.1.0
 
-      - name: Helm lint
-        run: helm lint ./chart
+      - name: Helm lint chart
+        run: helm lint ./${{ env.MODULE }}-chart
 
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1
+
+      # Prepare a sanitized version string (replace '.' with '-') and store it in K8S_VERSION_NODOT
+      - name: Prepare version variable
+        run: echo "K8S_VERSION_NODOT=$(echo '${{ matrix.k8s_version }}' | tr '.' '-')" >> $GITHUB_ENV
 
       - name: Install AWS Signing Helper
         run: |
