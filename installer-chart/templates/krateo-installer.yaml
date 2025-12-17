@@ -4623,9 +4623,13 @@ spec:
           {{- if .Values.krateoplatformops.finopsdatabasehandler.fullnameOverride }}
           - name: env.FINOPS_DATABASE_HANDLER_ENDPOINT_NAME
             value: {{ .Values.krateoplatformops.finopsdatabasehandler.fullnameOverride }}-endpoint
+          - name: env.FINOPS_DATABASE_HANDLER_ENDPOINT_NAMESPACE
+            value: {{ .Release.Namespace }}
           {{- else }}
           - name: env.FINOPS_DATABASE_HANDLER_ENDPOINT_NAME
             value: finops-database-handler-endpoint
+          - name: env.FINOPS_DATABASE_HANDLER_ENDPOINT_NAMESPACE
+            value: {{ .Release.Namespace }}
           {{- end }}
           - name: env.DATABASE_CONFIG_NAMESPACE
             value: {{ .Release.Namespace }}
