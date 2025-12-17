@@ -672,8 +672,8 @@ jobs:
         run: |
           kubectl get nodegroup/cluster-$K8S_VERSION_NODOT -o yaml
 
-      - name: Get kubeconfig
-        run: AWS_SHARED_CREDENTIALS_FILE=./credentials aws eks update-kubeconfig --region eu-central-1 --name cluster-${K8S_VERSION_NODOT} --profile dev
+      # - name: Get kubeconfig
+      #   run: AWS_SHARED_CREDENTIALS_FILE=./credentials aws eks update-kubeconfig --region eu-central-1 --name cluster-${K8S_VERSION_NODOT} --profile dev
 
       - name: Get events
         if: always()
