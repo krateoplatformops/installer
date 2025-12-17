@@ -679,15 +679,10 @@ jobs:
         if: always()
         run: kubectl get events -A --sort-by='.lastTimestamp'
 
-      - name: Get deployments
-        if: always()
-        run: kubectl get deployments -A
-
-      - name: Get controllers logs
+      - name: describe-nodegroup
         if: always()
         run: |
-          kubectl -n ack-system logs deploy/ack-eks-controller-eks-chart --tail=500
-          kubectl -n ack-system logs deploy/ack-ec2-controller-ec2-chart --tail=500
+          aws eks describe-nodegroup --region eu-central-1 --cluster-name cluster-$K8S_VERSION_NODOT --nodegroup-name cluster-$K8S_VERSION_NODOT
 
       - name: Clean Up Sensitive Files
         if: always()
