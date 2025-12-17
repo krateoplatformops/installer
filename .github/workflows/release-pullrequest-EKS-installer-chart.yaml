@@ -128,6 +128,12 @@ jobs:
           SESSION_TOKEN=$(echo $CREDS | jq -r '.SessionToken')
           EXPIRATION=$(echo $CREDS | jq -r '.Expiration')
 
+          # Export to GITHUB_ENV
+          echo "AWS_ACCESS_KEY_ID=$ACCESS_KEY" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$SECRET_KEY" >> "$GITHUB_ENV"
+          echo "AWS_SESSION_TOKEN=$SESSION_TOKEN" >> "$GITHUB_ENV"
+          echo "AWS_DEFAULT_REGION=eu-central-1" >> "$GITHUB_ENV"
+
           cat > ./credentials <<EOF
           [dev]
           aws_access_key_id = $ACCESS_KEY
@@ -672,8 +678,8 @@ jobs:
         run: |
           kubectl get nodegroup/cluster-$K8S_VERSION_NODOT -o yaml
 
-      # - name: Get kubeconfig
-      #   run: AWS_SHARED_CREDENTIALS_FILE=./credentials aws eks update-kubeconfig --region eu-central-1 --name cluster-${K8S_VERSION_NODOT} --profile dev
+      #  - name: Get kubeconfig
+      #    run: aws eks update-kubeconfig --region eu-central-1 --name cluster-${K8S_VERSION_NODOT} --profile dev
 
       - name: Get events
         if: always()
