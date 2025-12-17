@@ -863,7 +863,7 @@ jobs:
             --output json || true
           echo
 
-      - name: Optional: Check EKS access entries (new auth path)
+      - name: Check EKS access entries (new auth path)
         shell: bash
         run: |
           set -euo pipefail
