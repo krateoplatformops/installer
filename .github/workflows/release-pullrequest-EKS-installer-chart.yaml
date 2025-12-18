@@ -446,7 +446,22 @@ jobs:
 
       - name: Get authn logs
         if: always()
-        run: kubectl logs deployment/authn -n krateo-system --previous > debug/authn.log 2>&1 || true
+        run: |
+          set -euo pipefail
+
+          mkdir -p debug
+          : > debug/authn.log   # create empty file no matter what
+
+          echo "== kubectl logs deployment/authn =="
+          # never fail the step; always append output to the file
+          kubectl logs deployment/authn -n krateo-system >> debug/authn.log 2>&1 || true
+
+          echo "== file stats =="
+          ls -la debug || true
+          echo "Lines: $(wc -l < debug/authn.log || echo 0)"
+          echo
+          echo "== tail (last 300 lines) =="
+          tail -n 300 debug/authn.log || true
 
       - name: Upload authn logs
         if: always()
