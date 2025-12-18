@@ -446,7 +446,14 @@ jobs:
 
       - name: Get authn logs
         if: always()
-        run: kubectl logs deployment/authn -n krateo-system --previous
+        run: kubectl logs deployment/authn -n krateo-system --previous > debug/authn.log 2>&1 || true
+
+      - name: Upload authn logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authn-logs
+          path: debug/authn.log
 
       - name: Get Krateo PlatformOps CR status on ManagedCluster
         if: always()
