@@ -432,6 +432,18 @@ jobs:
             --timeout=600s \
             --namespace=krateo-system
 
+      - name: Get events
+        if: always()
+        run: kubectl get events -n krateo-system --sort-by='.lastTimestamp'
+
+      - name: List helm charts
+        if: always()
+        run: helm list -n krateo-system
+
+      - name: Get pods
+        if: always()
+        run: kubectl get pods -n krateo-system
+
       - name: Get Krateo PlatformOps CR status on ManagedCluster
         if: always()
         run: kubectl get krateoplatformops krateo --namespace krateo-system -o yaml
@@ -448,19 +460,17 @@ jobs:
         if: always()
         run: kubectl delete namespace krateo-system
 
-      - name: Get events
-        if: always()
-        run: kubectl get events -A --sort-by='.lastTimestamp'
-
       - name: Clean Up Sensitive Files
         if: always()
         run: rm -f certificato.txt chiave_privata_decifrata.key ./credentials
 
       - name: Revert kubeconfig to kind
+        if: always()
         run: |
           kubectl config use-context kind-chart-testing
 
       - name: Get kubeconfig contexts
+        if: always()
         run: |
           kubectl config get-contexts
 
