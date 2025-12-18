@@ -479,7 +479,8 @@ jobs:
             | jq -r 'to_entries | map("-l \(.key)=\(.value)") | join(" ")' \
             | xargs kubectl get pods -n krateo-system -o name \
             | head -n 1
-)
+          )
+
       - name: Get Krateo PlatformOps CR status on ManagedCluster
         if: always()
         run: kubectl get krateoplatformops krateo --namespace krateo-system -o yaml
