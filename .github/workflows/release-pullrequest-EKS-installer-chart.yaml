@@ -393,7 +393,7 @@ jobs:
 
       - name: Get kubeconfig
         run: |
-          aws eks update-kubeconfig --region eu-central-1 --name cluster-{K8S_VERSION_NODOT}
+          aws eks update-kubeconfig --region eu-central-1 --name cluster-$K8S_VERSION_NODOT
 
       - name: Get kubeconfig updated contexts
         run: |
