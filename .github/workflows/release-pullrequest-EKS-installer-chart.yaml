@@ -434,19 +434,19 @@ jobs:
 
       - name: Get Krateo PlatformOps CR status on ManagedCluster
         if: always()
-        run: kubectl get krateoplatformops krateo --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml -o yaml
+        run: kubectl get krateoplatformops krateo --namespace krateo-system -o yaml
 
       - name: Clean Up Krateo PlatformOps CR on ManagedCluster
         if: always()
-        run: kubectl delete krateoplatformops krateo --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: kubectl delete krateoplatformops krateo --namespace krateo-system 
 
       - name: Clean Up Installer Helm Chart on ManagedCluster
         if: always()
-        run: helm uninstall ${{ env.MODULE }} --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: helm uninstall ${{ env.MODULE }} --namespace krateo-system 
 
       - name: Clean Up krateo-system namespace on ManagedCluster
         if: always()
-        run: kubectl delete namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+        run: kubectl delete namespace krateo-system
 
       - name: Get events
         if: always()
