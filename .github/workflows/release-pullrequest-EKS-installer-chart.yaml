@@ -454,7 +454,7 @@ jobs:
 
           echo "== kubectl logs deployment/authn =="
           # never fail the step; always append output to the file
-          kubectl logs deployment/authn -n krateo-system >> debug/authn.log 2>&1 || true
+          kubectl logs deployment/authn -n krateo-system --previous >> debug/authn.log 2>&1 || true
 
           echo "== file stats =="
           ls -la debug || true
@@ -470,6 +470,16 @@ jobs:
           name: authn-logs
           path: debug/authn.log
 
+      - name: Describe authn pod
+        if: always()
+        run: |
+          kubectl describe pod -n krateo-system $(
+            kubectl get deploy authn -n krateo-system \
+              -o jsonpath='{.spec.selector.matchLabels}' \
+            | jq -r 'to_entries | map("-l \(.key)=\(.value)") | join(" ")' \
+            | xargs kubectl get pods -n krateo-system -o name \
+            | head -n 1
+)
       - name: Get Krateo PlatformOps CR status on ManagedCluster
         if: always()
         run: kubectl get krateoplatformops krateo --namespace krateo-system -o yaml
