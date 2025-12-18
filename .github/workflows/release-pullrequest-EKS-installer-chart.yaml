@@ -446,7 +446,7 @@ jobs:
 
       - name: Get authn logs
         if: always()
-        run: kubectl logs deployment/authn -n krateo-system
+        run: kubectl logs deployment/authn -n krateo-system --previous
 
       - name: Get Krateo PlatformOps CR status on ManagedCluster
         if: always()
