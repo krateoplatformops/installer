@@ -684,212 +684,70 @@ jobs:
         run: |
           kubectl get nodegroup/cluster-$K8S_VERSION_NODOT -o yaml
 
-      #  - name: Get kubeconfig
-      #    run: aws eks update-kubeconfig --region eu-central-1 --name cluster-${K8S_VERSION_NODOT} --profile dev
+       - name: Get kubeconfig contexts
+         run: |
+          kubectl config get-contexts
+
+       - name: Get kubeconfig
+         run: |
+          aws eks update-kubeconfig --region eu-central-1 --name cluster-{K8S_VERSION_NODOT}
+
+       - name: Get kubeconfig updated contexts
+         run: |
+          kubectl config get-contexts
+
+      - name: Install ${{ env.MODULE }}-crd chart
+        if: env.INSTALL_CRDS == 'true'
+        run: |
+          helm repo add krateo https://charts.krateo.io
+          helm repo update krateo
+          helm install ${{ env.MODULE }}-crd krateo/${{ env.MODULE }}-crd \
+            --create-namespace -n krateo-system --wait
+
+      - name: Get ${{ env.MODULE }}-crd
+        if: env.INSTALL_CRDS == 'true'
+        run: |
+          kubectl get crd
+
+      - name: Install ${{ env.MODULE }} chart
+        run: |
+          helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart \
+            --create-namespace -n krateo-system --wait \
+            --set krateoplatformops.service.type=LoadBalancer \
+            --set krateoplatformops.service.externalIpAvailable=false
+
+      - name: Wait for ${{ env.MODULE }} deployment to become Available
+        if: env.HAS_DEPLOYMENT == 'true'
+        run: |
+          kubectl wait deployment ${{ env.MODULE }} --for condition=Available=True \
+            --timeout=120s --namespace krateo-system
+
+      - name: Wait for krateoplatformops krateo to become ready
+        run: |
+          kubectl wait krateoplatformops krateo \
+            --for condition=Ready=True \
+            --timeout=600s \
+            --namespace=krateo-system
+
+      - name: Get Krateo PlatformOps CR status on ManagedCluster
+        if: always()
+        run: kubectl get krateoplatformops krateo --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml -o yaml
+
+      - name: Clean Up Krateo PlatformOps CR on ManagedCluster
+        if: always()
+        run: kubectl delete krateoplatformops krateo --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+
+      - name: Clean Up Installer Helm Chart on ManagedCluster
+        if: always()
+        run: helm uninstall ${{ env.MODULE }} --namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
+
+      - name: Clean Up krateo-system namespace on ManagedCluster
+        if: always()
+        run: kubectl delete namespace krateo-system --kubeconfig=managedcluster-$K8S_VERSION_NODOT-kubeconfig.yaml
 
       - name: Get events
         if: always()
         run: kubectl get events -A --sort-by='.lastTimestamp'
-
-      - name: describe-nodegroup
-        if: always()
-        run: |
-          aws eks describe-nodegroup --region eu-central-1 --cluster-name cluster-$K8S_VERSION_NODOT --nodegroup-name cluster-$K8S_VERSION_NODOT
-
-      - name: Debug EKS nodegroup (describe + health issues)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          CLUSTER="cluster-${K8S_VERSION_NODOT}"
-          NODEGROUP="cluster-${K8S_VERSION_NODOT}"
-          REGION="eu-central-1"
-
-          echo "Cluster:   $CLUSTER"
-          echo "Nodegroup: $NODEGROUP"
-          echo "Region:    $REGION"
-          echo
-
-          echo "== aws eks describe-nodegroup (full) =="
-          aws eks describe-nodegroup \
-            --region "$REGION" \
-            --cluster-name "$CLUSTER" \
-            --nodegroup-name "$NODEGROUP" \
-            --output json | tee describe-nodegroup.json
-          echo
-
-          echo "== Nodegroup health issues (table) =="
-          aws eks describe-nodegroup \
-            --region "$REGION" \
-            --cluster-name "$CLUSTER" \
-            --nodegroup-name "$NODEGROUP" \
-            --query 'nodegroup.health.issues[*].{code:code,message:message,resourceIds:resourceIds}' \
-            --output table || true
-          echo
-
-          echo "== Nodegroup status summary =="
-          aws eks describe-nodegroup \
-            --region "$REGION" \
-            --cluster-name "$CLUSTER" \
-            --nodegroup-name "$NODEGROUP" \
-            --query 'nodegroup.{status:status,version:version,releaseVersion:releaseVersion,createdAt:createdAt,modifiedAt:modifiedAt}' \
-            --output table
-          echo
-
-          echo "== Extract ASG name =="
-          ASG="$(aws eks describe-nodegroup \
-            --region "$REGION" \
-            --cluster-name "$CLUSTER" \
-            --nodegroup-name "$NODEGROUP" \
-            --query 'nodegroup.resources.autoScalingGroups[0].name' \
-            --output text)"
-          echo "ASG: $ASG"
-          echo "ASG=$ASG" >> "$GITHUB_ENV"
-          echo
-
-          echo "== Extract instance IDs from health issues (if present) =="
-          INSTANCE_IDS="$(aws eks describe-nodegroup \
-            --region "$REGION" \
-            --cluster-name "$CLUSTER" \
-            --nodegroup-name "$NODEGROUP" \
-            --query 'nodegroup.health.issues[?code==`NodeCreationFailure`].resourceIds[]' \
-            --output text || true)"
-          echo "INSTANCE_IDS: ${INSTANCE_IDS:-<none>}"
-          echo "INSTANCE_IDS=${INSTANCE_IDS}" >> "$GITHUB_ENV"
-          echo
-
-      - name: Debug AutoScaling activity (ASG scaling activities)
-        shell: bash
-        run: |
-          set -euo pipefail
-          REGION="eu-central-1"
-
-          if [[ -z "${ASG:-}" ]]; then
-            echo "ASG not set; skipping."
-            exit 0
-          fi
-
-          echo "== autoscaling describe-scaling-activities (last 20) =="
-          aws autoscaling describe-scaling-activities \
-            --region "$REGION" \
-            --auto-scaling-group-name "$ASG" \
-            --max-items 20 \
-            --query 'Activities[*].[StartTime,StatusCode,Description,Cause]' \
-            --output table || true
-          echo
-
-      - name: Debug one EC2 instance (console output + describe)
-        shell: bash
-        run: |
-          set -euo pipefail
-          REGION="eu-central-1"
-
-          if [[ -z "${INSTANCE_IDS:-}" ]]; then
-            echo "No instance IDs found in nodegroup health issues; skipping."
-            exit 0
-          fi
-
-          # Pick the first instance ID
-          FIRST_INSTANCE="$(echo "$INSTANCE_IDS" | awk '{print $1}')"
-          echo "Using instance: $FIRST_INSTANCE"
-          echo "FIRST_INSTANCE=$FIRST_INSTANCE" >> "$GITHUB_ENV"
-          echo
-
-          echo "== ec2 describe-instances (summary) =="
-          aws ec2 describe-instances \
-            --region "$REGION" \
-            --instance-ids "$FIRST_INSTANCE" \
-            --query 'Reservations[0].Instances[0].{State:State.Name,PrivateIp:PrivateIpAddress,SubnetId:SubnetId,VpcId:VpcId,SGs:SecurityGroups[*].GroupId,LaunchTime:LaunchTime,ImageId:ImageId,InstanceType:InstanceType}' \
-            --output table || true
-          echo
-
-          echo "== ec2 get-console-output (latest) =="
-          # This is where bootstrap/cloud-init/kubelet join errors often appear
-          aws ec2 get-console-output \
-            --region "$REGION" \
-            --instance-id "$FIRST_INSTANCE" \
-            --latest \
-            --output text || true
-          echo
-
-      - name: Debug EKS cluster endpoint access mode
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          CLUSTER="cluster-${K8S_VERSION_NODOT}"
-          REGION="eu-central-1"
-
-          echo "== eks describe-cluster endpoint flags =="
-          aws eks describe-cluster \
-            --region "$REGION" \
-            --name "$CLUSTER" \
-            --query 'cluster.resourcesVpcConfig.{endpointPublicAccess:endpointPublicAccess,endpointPrivateAccess:endpointPrivateAccess,publicAccessCidrs:publicAccessCidrs}' \
-            --output table
-          echo
-
-          echo "== eks describe-cluster control-plane security groups & subnets =="
-          aws eks describe-cluster \
-            --region "$REGION" \
-            --name "$CLUSTER" \
-            --query 'cluster.resourcesVpcConfig.{subnetIds:subnetIds,securityGroupIds:securityGroupIds,clusterSecurityGroupId:clusterSecurityGroupId,vpcId:vpcId}' \
-            --output json
-          echo
-
-      - name: Debug nodegroup subnets route tables (IGW/NAT check)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          CLUSTER="cluster-${K8S_VERSION_NODOT}"
-          NODEGROUP="cluster-${K8S_VERSION_NODOT}"
-          REGION="eu-central-1"
-
-          echo "== Get nodegroup subnet IDs =="
-          SUBNETS="$(aws eks describe-nodegroup \
-            --region "$REGION" \
-            --cluster-name "$CLUSTER" \
-            --nodegroup-name "$NODEGROUP" \
-            --query 'nodegroup.subnets' \
-            --output text || true)"
-          echo "Subnets: ${SUBNETS:-<none>}"
-          echo
-
-          if [[ -z "${SUBNETS:-}" ]]; then
-            echo "No subnets found; skipping."
-            exit 0
-          fi
-
-          echo "== Describe route tables associated to these subnets =="
-          # This helps spot "private subnet without NAT" and similar routing issues
-          aws ec2 describe-route-tables \
-            --region "$REGION" \
-            --filters "Name=association.subnet-id,Values=${SUBNETS// /,}" \
-            --query 'RouteTables[*].{rtb:RouteTableId,associations:Associations[*].SubnetId,routes:Routes[*].{dest:DestinationCidrBlock,gw:GatewayId,nat:NatGatewayId,tgw:TransitGatewayId,eni:NetworkInterfaceId}}' \
-            --output json || true
-          echo
-
-      - name: Check EKS access entries (new auth path)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          CLUSTER="cluster-${K8S_VERSION_NODOT}"
-          REGION="eu-central-1"
-
-          echo "== eks list-access-entries =="
-          aws eks list-access-entries \
-            --region "$REGION" \
-            --cluster-name "$CLUSTER" \
-            --output json || true
-          echo
-
-      - name: Upload debug artifacts (describe-nodegroup.json)
-        uses: actions/upload-artifact@v4
-        with:
-          name: eks-nodegroup-debug
-          path: |
-            describe-nodegroup.json
 
       - name: Clean Up Sensitive Files
         if: always()
@@ -902,26 +760,6 @@ jobs:
       - name: Clean Up Cluster Resource
         if: always()
         run: kubectl delete cluster/cluster-$K8S_VERSION_NODOT
-
-      - name: Clean Up VPC Endpoints Resources
-        if: always()
-        run: |
-          kubectl delete vpcendpoint/cluster-$K8S_VERSION_NODOT-ec2-endpoint
-          kubectl delete vpcendpoint/cluster-$K8S_VERSION_NODOT-ecr-api-endpoint
-          kubectl delete vpcendpoint/cluster-$K8S_VERSION_NODOT-ecr-dkr-endpoint
-          kubectl delete vpcendpoint/cluster-$K8S_VERSION_NODOT-sts-endpoint
-
-      - name: Clean Up VPC Endpoints Security Group Resource
-        if: always()
-        run: kubectl delete securitygroup/cluster-$K8S_VERSION_NODOT-vpce-sg
-
-      - name: Celan Up Node Security Group Resource
-        if: always()
-        run: kubectl delete securitygroup/cluster-$K8S_VERSION_NODOT-node-sg
-
-      - name: Clean Up EKS Security Group Resource
-        if: always()
-        run: kubectl delete securitygroup/cluster-$K8S_VERSION_NODOT-eks-sg
 
       - name: Clean Up Public Subnet-2 Resource
         if: always()
