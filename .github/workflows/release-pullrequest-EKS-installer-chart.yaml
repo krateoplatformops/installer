@@ -456,6 +456,14 @@ jobs:
         if: always()
         run: rm -f certificato.txt chiave_privata_decifrata.key ./credentials
 
+      - name: Revert kubeconfig to kind
+        run: |
+          kubectl config use-context kind-chart-testing
+
+      - name: Get kubeconfig contexts
+        run: |
+          kubectl config get-contexts
+
       - name: Clean Up Nodegroup Resource
         if: always()
         run: kubectl delete nodegroup/cluster-$K8S_VERSION_NODOT
