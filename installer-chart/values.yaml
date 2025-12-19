@@ -281,7 +281,7 @@ krateoplatformops:
   eventrouter:
     chart:
       name: eventrouter
-      version: 0.6.4
+      version: 0.6.5
       repository: https://charts.krateo.io
       wait: true
       waitTimeout: 5m
@@ -408,7 +408,7 @@ krateoplatformops:
   frontend:
     chart:
       name: frontend
-      version: 1.0.2
+      version: 1.0.4
       repository: https://charts.krateo.io
       wait: true
       waitTimeout: 5m
