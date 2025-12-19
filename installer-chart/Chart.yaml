@@ -28,3 +28,8 @@ icon: "https://github.com/krateoplatformops/krateo/blob/main/docs/media/logo.svg
 
 sources:
   - https://github.com/krateoplatformops/installer
+
+dependencies:
+- name: installer-pre-upgrade-2-7-0
+  version: CHART_VERSION
+  repository: "https://charts.krateo.io"
