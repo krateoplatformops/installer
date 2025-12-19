@@ -32,7 +32,9 @@ subjects:
 ---
 {{- end }}
 
-{{- $job := lookup "batch/v1" "Job" .Release.Namespace "krateo-pre-upgrade-{{ .Chart.Version | replace "." "-" }}" }}
+{{- $versionSuffix := .Chart.Version | replace "." "-" -}}
+{{- $jobName := printf "krateo-pre-upgrade-%s" $versionSuffix -}}
+{{- $job := lookup "batch/v1" "Job" .Release.Namespace $jobName -}}
 {{- if not $job }}
 apiVersion: batch/v1
 kind: Job
