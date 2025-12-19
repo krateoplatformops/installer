@@ -32,12 +32,12 @@ subjects:
 ---
 {{- end }}
 
-{{- $job := lookup "batch/v1" "Job" .Release.Namespace "krateo-pre-upgrade-2-7-0" }}
+{{- $job := lookup "batch/v1" "Job" .Release.Namespace "krateo-pre-upgrade-{{ .Chart.Version | replace "." "-" }}" }}
 {{- if not $job }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: krateo-pre-upgrade-2-7-0
+  name: krateo-pre-upgrade-{{ .Chart.Version | replace "." "-" }}
   namespace: krateo-system
 spec:
   backoffLimit: 3
@@ -73,5 +73,5 @@ spec:
               helm uninstall resource-tree-handler -n {{ .Values.krateoNamespace }} \
                 || echo "WARN: Failed to uninstall resource-tree-handler release in {{ .Values.krateoNamespace }}"
 
-              echo "Pre-upgrade 2.7.0 job done ✅ (errors above, if any, were non-blocking)"
+              echo "Pre-upgrade {{ .Chart.Version }} job done ✅ (errors above, if any, were non-blocking)"
 {{- end }}
