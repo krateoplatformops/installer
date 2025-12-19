@@ -30,6 +30,6 @@ sources:
   - https://github.com/krateoplatformops/installer
 
 dependencies:
-- name: installer-pre-upgrade-2-7-0
+- name: installer-pre-upgrade
   version: CHART_VERSION
   repository: "https://charts.krateo.io"
