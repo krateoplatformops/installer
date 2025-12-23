@@ -352,18 +352,9 @@ jobs:
           kubectl get crd \
             --kubeconfig=openshiftcluster-$K8S_VERSION_NODOT-kubeconfig.yaml --insecure-skip-tls-verify=true
 
-      - name: Package local dependency
+      - name: Build local dependencies charts
         run: |
-          # 1. Create the charts/ directory inside your main chart
-          mkdir -p ./${{ env.MODULE }}-chart/charts
-          
-          # 2. Package the pre-upgrade chart from its local folder
-          # Assuming the folder is in the root of the workspace
-          # We place the resulting .tgz directly into the main chart's 'charts' folder
-          helm package ./${{ env.MODULE }}-pre-upgrade-chart --destination ./${{ env.MODULE }}-chart/charts/
-          
-          # 3. List files to verify the .tgz is there (for debugging)
-          ls -R ./${{ env.MODULE }}-chart/charts/
+          helm dependency build ./${{ env.MODULE }}-chart
 
       - name: Install ${{ env.MODULE }} chart
         run: |
