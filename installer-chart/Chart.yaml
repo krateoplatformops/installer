@@ -32,4 +32,4 @@ sources:
 dependencies:
 - name: installer-pre-upgrade
   version: CHART_VERSION
-  repository: "https://charts.krateo.io"
+  repository: file://../installer-pre-upgrade-chart
