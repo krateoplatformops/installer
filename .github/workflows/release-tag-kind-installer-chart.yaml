@@ -134,6 +134,7 @@ jobs:
         run: |
           mkdir -p _${{ env.MODULE }}-chart
           cp -R ${{ env.MODULE }}-chart _${{ env.MODULE }}-chart/
+          cp -R ${{ env.MODULE }}-pre-upgrade-chart _${{ env.MODULE }}-chart/
 
       - name: Publish Helm chart
         uses: stefanprodan/helm-gh-pages@master
