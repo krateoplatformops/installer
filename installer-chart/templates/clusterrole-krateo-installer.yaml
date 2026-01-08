@@ -33,7 +33,7 @@ rules:
     resources: ["registrations"]
     verbs: ["*"]
   - apiGroups: ["admissionregistration.k8s.io"]
-    resources: ["mutatingwebhookconfigurations"]
+    resources: ["mutatingwebhookconfigurations", "validatingadmissionpolicies", "validatingadmissionpolicybindings"]
     verbs: ["*"]
   {{ if and .Values.krateoplatformops.composablefinops.enabled .Values.krateoplatformops.finopscratedb.openshift }}
   - apiGroups: ["security.openshift.io"]
