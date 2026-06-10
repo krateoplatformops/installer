@@ -1930,6 +1930,14 @@ spec:
           - name: image.tag
             value: {{ .Values.krateoplatformops.eventsse.sweeper.image.tag }}
           {{- end }}
+          {{- if and .Values.krateoplatformops.eventsse.sweeper.scaler .Values.krateoplatformops.eventsse.sweeper.scaler.image .Values.krateoplatformops.eventsse.sweeper.scaler.image.repository }}
+          - name: scaler.image.repository
+            value: {{ .Values.krateoplatformops.eventsse.sweeper.scaler.image.repository }}
+          {{- end }}
+          {{- if and .Values.krateoplatformops.eventsse.sweeper.scaler .Values.krateoplatformops.eventsse.sweeper.scaler.image .Values.krateoplatformops.eventsse.sweeper.scaler.image.tag }}
+          - name: scaler.image.tag
+            value: {{ .Values.krateoplatformops.eventsse.sweeper.scaler.image.tag }}
+          {{- end }}
 
     - id: install-frontend
       type: chart
