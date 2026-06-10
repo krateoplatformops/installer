@@ -379,7 +379,7 @@ krateoplatformops:
     sweeper:
       chart:
         name: sweeper
-        version: 0.2.0
+        version: 0.2.1
         repository: https://charts.krateo.io
         wait: true
         waitTimeout: 5m
