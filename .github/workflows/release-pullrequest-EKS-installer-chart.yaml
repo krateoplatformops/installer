@@ -128,6 +128,12 @@ jobs:
           SESSION_TOKEN=$(echo $CREDS | jq -r '.SessionToken')
           EXPIRATION=$(echo $CREDS | jq -r '.Expiration')
 
+          # Export to GITHUB_ENV
+          echo "AWS_ACCESS_KEY_ID=$ACCESS_KEY" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$SECRET_KEY" >> "$GITHUB_ENV"
+          echo "AWS_SESSION_TOKEN=$SESSION_TOKEN" >> "$GITHUB_ENV"
+          echo "AWS_DEFAULT_REGION=eu-central-1" >> "$GITHUB_ENV"
+
           cat > ./credentials <<EOF
           [dev]
           aws_access_key_id = $ACCESS_KEY
@@ -268,6 +274,9 @@ jobs:
             vpcRef: 
               from: 
                 name: cluster-$K8S_VERSION_NODOT
+            routeTableRefs:
+            - from:
+                name: cluster-$K8S_VERSION_NODOT-public-rt
           EOF
 
       - name: Wait for Public Subnet-1 Provisioning
@@ -295,6 +304,9 @@ jobs:
             vpcRef: 
               from: 
                 name: cluster-$K8S_VERSION_NODOT
+            routeTableRefs:
+            - from:
+                name: cluster-$K8S_VERSION_NODOT-public-rt
           EOF
 
       - name: Wait for Public Subnet-2 Provisioning
@@ -306,303 +318,6 @@ jobs:
         if: always()
         run: |
           kubectl get subnet/cluster-$K8S_VERSION_NODOT-public-2 -o yaml
-
-      # - name: Create Security Group for EKS Control Plane
-      #   run: |
-      #     echo "Creating Security Group for EKS Control Plane..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: SecurityGroup
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-eks-sg
-      #     spec:
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #       description: Security group for EKS Control Plane
-      #       name: cluster-$K8S_VERSION_NODOT-eks-sg
-      #       ingressRules:
-      #         - ipProtocol: tcp
-      #           fromPort: 443
-      #           toPort: 443
-      #           ipRanges:
-      #             - cidrIP: 0.0.0.0/0
-      #               description: Allow HTTPS from anywhere
-      #       egressRules:
-      #         - ipProtocol: "-1"
-      #           fromPort: -1
-      #           toPort: -1
-      #           ipRanges:
-      #             - cidrIP: 0.0.0.0/0
-      #               description: Allow all outbound traffic
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-eks-sg
-      #     EOF
-
-      # - name: Wait for EKS Security Group Provisioning
-      #   run: |
-      #     echo "Waiting for EKS Security Group to become ready..."
-      #     kubectl wait --for=condition=ACK.ResourceSynced --timeout=300s securitygroup/cluster-$K8S_VERSION_NODOT-eks-sg
-
-      # - name: Create Security Group for Worker Nodes
-      #   run: |
-      #     echo "Creating Security Group for EKS Worker Nodes..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: SecurityGroup
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-node-sg
-      #     spec:
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #       description: Security group for EKS Worker Nodes
-      #       name: cluster-$K8S_VERSION_NODOT-node-sg
-      #       ingressRules:
-      #         - ipProtocol: tcp
-      #           fromPort: 1025
-      #           toPort: 65535
-      #           ipRanges:
-      #             - cidrIP: 10.0.0.0/16
-      #               description: Allow all traffic from within VPC
-      #         - ipProtocol: tcp
-      #           fromPort: 443
-      #           toPort: 443
-      #           ipRanges:
-      #             - cidrIP: 10.0.0.0/16
-      #               description: Allow HTTPS from VPC
-      #         - ipProtocol: tcp
-      #           fromPort: 22
-      #           toPort: 22
-      #           ipRanges:
-      #             - cidrIP: 0.0.0.0/0
-      #               description: Allow SSH from anywhere
-      #       egressRules:
-      #         - ipProtocol: "-1"
-      #           fromPort: -1
-      #           toPort: -1
-      #           ipRanges:
-      #             - cidrIP: 0.0.0.0/0
-      #               description: Allow all outbound traffic
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-node-sg
-      #         - key: kubernetes.io/cluster/cluster-$K8S_VERSION_NODOT
-      #           value: owned
-      #     EOF
-
-      # - name: Wait for Node Security Group Provisioning
-      #   run: |
-      #     echo "Waiting for Node Security Group to become ready..."
-      #     kubectl wait --for=condition=ACK.ResourceSynced --timeout=300s securitygroup/cluster-$K8S_VERSION_NODOT-node-sg
-
-      # - name: Create Security Group for VPC Endpoints
-      #   run: |
-      #     echo "Creating Security Group for VPC Endpoints..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: SecurityGroup
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-vpce-sg
-      #     spec:
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #       description: Security group for VPC Endpoints
-      #       name: cluster-$K8S_VERSION_NODOT-vpce-sg
-      #       ingressRules:
-      #         - ipProtocol: tcp
-      #           fromPort: 443
-      #           toPort: 443
-      #           ipRanges:
-      #             - cidrIP: 10.0.0.0/16
-      #               description: Allow HTTPS from VPC CIDR
-      #       egressRules:
-      #         - ipProtocol: "-1"
-      #           fromPort: -1
-      #           toPort: -1
-      #           ipRanges:
-      #             - cidrIP: 0.0.0.0/0
-      #               description: Allow all outbound traffic
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-vpce-sg
-      #     EOF
-
-      # - name: Wait for VPC Endpoints Security Group Provisioning
-      #   run: |
-      #     echo "Waiting for VPC Endpoints Security Group to become ready..."
-      #     kubectl wait --for=condition=ACK.ResourceSynced --timeout=300s securitygroup/cluster-$K8S_VERSION_NODOT-vpce-sg
-
-      # - name: Deploy VPC Endpoint for EC2
-      #   run: |
-      #     echo "Deploying VPC Endpoint for EC2..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: VPCEndpoint
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-ec2-endpoint
-      #     spec:
-      #       serviceName: com.amazonaws.eu-central-1.ec2
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #       subnetRefs:
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-public-1
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-public-2
-      #       securityGroupRefs:
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-vpce-sg
-      #       vpcEndpointType: Interface
-      #       privateDNSEnabled: true
-      #       policyDocument: |
-      #         {
-      #           "Version": "2012-10-17",
-      #           "Statement": [
-      #             {
-      #               "Effect": "Allow",
-      #               "Principal": "*",
-      #               "Action": "*",
-      #               "Resource": "*"
-      #             }
-      #           ]
-      #         }
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-ec2-endpoint
-      #     EOF
-
-      # - name: Deploy VPC Endpoint for ECR API
-      #   run: |
-      #     echo "Deploying VPC Endpoint for ECR API..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: VPCEndpoint
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-ecr-api-endpoint
-      #     spec:
-      #       serviceName: com.amazonaws.eu-central-1.ecr.api
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #       subnetRefs:
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-public-1
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-public-2
-      #       securityGroupRefs:
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-vpce-sg
-      #       vpcEndpointType: Interface
-      #       privateDNSEnabled: true
-      #       policyDocument: |
-      #         {
-      #           "Version": "2012-10-17",
-      #           "Statement": [
-      #             {
-      #               "Effect": "Allow",
-      #               "Principal": "*",
-      #               "Action": "*",
-      #               "Resource": "*"
-      #             }
-      #           ]
-      #         }
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-ecr-api-endpoint
-      #     EOF
-
-      # - name: Deploy VPC Endpoint for ECR Docker
-      #   run: |
-      #     echo "Deploying VPC Endpoint for ECR Docker..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: VPCEndpoint
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-ecr-dkr-endpoint
-      #     spec:
-      #       serviceName: com.amazonaws.eu-central-1.ecr.dkr
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #       subnetRefs:
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-public-1
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-public-2
-      #       securityGroupRefs:
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-vpce-sg
-      #       vpcEndpointType: Interface
-      #       privateDNSEnabled: true
-      #       policyDocument: |
-      #         {
-      #           "Version": "2012-10-17",
-      #           "Statement": [
-      #             {
-      #               "Effect": "Allow",
-      #               "Principal": "*",
-      #               "Action": "*",
-      #               "Resource": "*"
-      #             }
-      #           ]
-      #         }
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-ecr-dkr-endpoint
-      #     EOF
-
-      # - name: Deploy VPC Endpoint for STS
-      #   run: |
-      #     echo "Deploying VPC Endpoint for STS..."
-      #     cat <<EOF | kubectl apply -f -
-      #     apiVersion: ec2.services.k8s.aws/v1alpha1
-      #     kind: VPCEndpoint
-      #     metadata:
-      #       name: cluster-$K8S_VERSION_NODOT-sts-endpoint
-      #     spec:
-      #       serviceName: com.amazonaws.eu-central-1.sts
-      #       vpcRef:
-      #         from:
-      #           name: cluster-$K8S_VERSION_NODOT
-      #       subnetRefs:
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-public-1
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-public-2
-      #       securityGroupRefs:
-      #         - from:
-      #             name: cluster-$K8S_VERSION_NODOT-vpce-sg
-      #       vpcEndpointType: Interface
-      #       privateDNSEnabled: true
-      #       policyDocument: |
-      #         {
-      #           "Version": "2012-10-17",
-      #           "Statement": [
-      #             {
-      #               "Effect": "Allow",
-      #               "Principal": "*",
-      #               "Action": "*",
-      #               "Resource": "*"
-      #             }
-      #           ]
-      #         }
-      #       tags:
-      #         - key: Name
-      #           value: cluster-$K8S_VERSION_NODOT-sts-endpoint
-      #     EOF
-
-      # Add a wait step for VPC Endpoints
-      #   - name: Wait for VPC Endpoints Provisioning
-      #     run: |
-      #       echo "Waiting for VPC Endpoints to become Ready..."
-      #       kubectl wait --for=condition=ACK.ResourceSynced --timeout=600s vpcendpoint/cluster-$K8S_VERSION_NODOT-ec2-endpoint
-      #       kubectl wait --for=condition=ACK.ResourceSynced --timeout=600s vpcendpoint/cluster-$K8S_VERSION_NODOT-ecr-api-endpoint
-      #       kubectl wait --for=condition=ACK.ResourceSynced --timeout=600s vpcendpoint/cluster-$K8S_VERSION_NODOT-ecr-dkr-endpoint
-      #       kubectl wait --for=condition=ACK.ResourceSynced --timeout=600s vpcendpoint/cluster-$K8S_VERSION_NODOT-sts-endpoint
 
       - name: Deploy Cluster CR via EKS Controller
         run: |
@@ -617,7 +332,7 @@ jobs:
             roleARN: arn:aws:iam::654654440307:role/EKSClusterRole
             version: "${{ matrix.k8s_version }}"
             resourcesVPCConfig:
-              endpointPrivateAccess: true
+              endpointPrivateAccess: false
               endpointPublicAccess: true
               subnetRefs:
               - from:
@@ -672,20 +387,129 @@ jobs:
         run: |
           kubectl get nodegroup/cluster-$K8S_VERSION_NODOT -o yaml
 
+      - name: Get kubeconfig contexts
+        run: |
+          kubectl config get-contexts
+
       - name: Get kubeconfig
-        run: AWS_SHARED_CREDENTIALS_FILE=./credentials aws eks update-kubeconfig --region eu-central-1 --name cluster-${K8S_VERSION_NODOT} --profile dev
+        run: |
+          aws eks update-kubeconfig --region eu-central-1 --name cluster-$K8S_VERSION_NODOT
+
+      - name: Get kubeconfig updated contexts
+        run: |
+          kubectl config get-contexts
+
+      - name: Install ${{ env.MODULE }}-crd chart
+        if: env.INSTALL_CRDS == 'true'
+        run: |
+          helm repo add krateo https://charts.krateo.io
+          helm repo update krateo
+          helm install ${{ env.MODULE }}-crd krateo/${{ env.MODULE }}-crd \
+            --create-namespace -n krateo-system --wait
+
+      - name: Get ${{ env.MODULE }}-crd
+        if: env.INSTALL_CRDS == 'true'
+        run: |
+          kubectl get crd
+
+      - name: Install ${{ env.MODULE }} chart
+        run: |
+          helm install ${{ env.MODULE }} ./${{ env.MODULE }}-chart \
+            --create-namespace -n krateo-system --wait \
+            --set krateoplatformops.service.type=LoadBalancer \
+            --set krateoplatformops.service.externalIpAvailable=false
+
+      - name: Wait for ${{ env.MODULE }} deployment to become Available
+        if: env.HAS_DEPLOYMENT == 'true'
+        run: |
+          kubectl wait deployment ${{ env.MODULE }} --for condition=Available=True \
+            --timeout=120s --namespace krateo-system
+
+      - name: Wait for krateoplatformops krateo to become ready
+        run: |
+          kubectl wait krateoplatformops krateo \
+            --for condition=Ready=True \
+            --timeout=600s \
+            --namespace=krateo-system
 
       - name: Get events
         if: always()
-        run: kubectl get events -A --sort-by='.lastTimestamp'
+        run: kubectl get events -n krateo-system --sort-by='.lastTimestamp'
 
-      - name: Get deployments
+      - name: List helm charts
         if: always()
-        run: kubectl get deployments -A
+        run: helm list -n krateo-system
+
+      - name: Get pods
+        if: always()
+        run: kubectl get pods -n krateo-system
+
+      - name: Get authn logs
+        if: always()
+        run: |
+          set -euo pipefail
+
+          mkdir -p debug
+          : > debug/authn.log   # create empty file no matter what
+
+          echo "== kubectl logs deployment/authn =="
+          # never fail the step; always append output to the file
+          kubectl logs deployment/authn -n krateo-system --previous >> debug/authn.log 2>&1 || true
+
+          echo "== file stats =="
+          ls -la debug || true
+          echo "Lines: $(wc -l < debug/authn.log || echo 0)"
+          echo
+          echo "== tail (last 300 lines) =="
+          tail -n 300 debug/authn.log || true
+
+      - name: Upload authn logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authn-logs
+          path: debug/authn.log
+
+      - name: Describe authn pod
+        if: always()
+        run: |
+          kubectl describe pod -n krateo-system $(
+            kubectl get deploy authn -n krateo-system \
+              -o jsonpath='{.spec.selector.matchLabels}' \
+            | jq -r 'to_entries | map("-l \(.key)=\(.value)") | join(" ")' \
+            | xargs kubectl get pods -n krateo-system -o name \
+            | head -n 1
+          )
+
+      - name: Get Krateo PlatformOps CR status on ManagedCluster
+        if: always()
+        run: kubectl get krateoplatformops krateo --namespace krateo-system -o yaml
+
+      - name: Clean Up Krateo PlatformOps CR on ManagedCluster
+        if: always()
+        run: kubectl delete krateoplatformops krateo --namespace krateo-system 
+
+      - name: Clean Up Installer Helm Chart on ManagedCluster
+        if: always()
+        run: helm uninstall ${{ env.MODULE }} --namespace krateo-system 
+
+      - name: Clean Up krateo-system namespace on ManagedCluster
+        if: always()
+        run: kubectl delete namespace krateo-system
 
       - name: Clean Up Sensitive Files
         if: always()
         run: rm -f certificato.txt chiave_privata_decifrata.key ./credentials
+
+      - name: Revert kubeconfig to kind
+        if: always()
+        run: |
+          kubectl config use-context kind-chart-testing
+
+      - name: Get kubeconfig contexts
+        if: always()
+        run: |
+          kubectl config get-contexts
 
       - name: Clean Up Nodegroup Resource
         if: always()
@@ -694,26 +518,6 @@ jobs:
       - name: Clean Up Cluster Resource
         if: always()
         run: kubectl delete cluster/cluster-$K8S_VERSION_NODOT
-
-      - name: Clean Up VPC Endpoints Resources
-        if: always()
-        run: |
-          kubectl delete vpcendpoint/cluster-$K8S_VERSION_NODOT-ec2-endpoint
-          kubectl delete vpcendpoint/cluster-$K8S_VERSION_NODOT-ecr-api-endpoint
-          kubectl delete vpcendpoint/cluster-$K8S_VERSION_NODOT-ecr-dkr-endpoint
-          kubectl delete vpcendpoint/cluster-$K8S_VERSION_NODOT-sts-endpoint
-
-      - name: Clean Up VPC Endpoints Security Group Resource
-        if: always()
-        run: kubectl delete securitygroup/cluster-$K8S_VERSION_NODOT-vpce-sg
-
-      - name: Celan Up Node Security Group Resource
-        if: always()
-        run: kubectl delete securitygroup/cluster-$K8S_VERSION_NODOT-node-sg
-
-      - name: Clean Up EKS Security Group Resource
-        if: always()
-        run: kubectl delete securitygroup/cluster-$K8S_VERSION_NODOT-eks-sg
 
       - name: Clean Up Public Subnet-2 Resource
         if: always()
