@@ -442,6 +442,7 @@ krateoplatformops:
       EVENTS_API_BASE_URL: "" # should be mapped to eventsse service
       ROUTES_LOADER: ""
       INIT: ""
+      THEME: ""
     env: {}
       # http_proxy: http://127.0.0.1:3128
     service: 

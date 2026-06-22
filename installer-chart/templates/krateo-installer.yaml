@@ -2272,6 +2272,10 @@ spec:
           - name: config.ROUTES_LOADER
             value: /call?resource=routesloaders&apiVersion=widgets.templates.krateo.io/v1beta1&name=routes-loader&namespace={{ .Release.Namespace }}
           {{- end }}
+          {{- if .Values.krateoplatformops.frontend.config.THEME }}
+          - name: config.THEME
+            value: {{ .Values.krateoplatformops.frontend.config.THEME }}&namespace={{ .Release.Namespace }}
+          {{- end }}
 
     - id: extract-eventsse-internal-port
       type: var
